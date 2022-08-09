@@ -1,8 +1,10 @@
 ### Instructions for use：
 
-After executing mvn package -DskipTests on the command line, import the generated package flink-connector-redis-1.0.11.jar into flink lib, no other settings are required.
+After executing mvn package -DskipTests on the command line, import the generated package
+flink-connector-redis-1.0.11.jar into flink lib, no other settings are required.
 
 Development environment engineering direct reference:
+
 ```
 <dependency>
     <groupId>io.github.jeff-zou</groupId>
@@ -12,6 +14,7 @@ Development environment engineering direct reference:
 ```
 
 # create tables in your database(support jdbc)
+
 ```
 
 CREATE TABLE `flink_catalog_databases` (
