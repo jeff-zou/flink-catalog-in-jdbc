@@ -51,6 +51,7 @@ CREATE TABLE `flink_catalog_columns` (
 )
 ```
 
+### usage
 ```
 create catalog  my_catalog with ( 'type'='generic_in_jdbc', 'default-database'='test', 'username'='test', 'password'='****',
 'url'='jdbc:mysql://*****:3306/test_database?useUnicode=true&characterEncoding=utf8&autoReconnect=true');
