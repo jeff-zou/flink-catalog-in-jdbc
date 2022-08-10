@@ -138,12 +138,12 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             pstmt.setString(2, database.getComment());
             pstmt.setString(3, objectMapper.writeValueAsString(database.getProperties()));
             pstmt.execute();
+            super.createDatabase(databaseName, database, ignoreIfExists);
         } catch (SQLException e) {
             throw new ValidationException(String.format("Failed create database %s.", database), e);
         } catch (JsonProcessingException e1) {
             throw new ValidationException(String.format("Failed format map to json."), e1);
         }
-        super.createDatabase(databaseName, database, ignoreIfExists);
     }
 
     @Override
@@ -194,7 +194,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 pstmt.setString(2, newDatabase.getComment());
                 pstmt.setString(3, objectMapper.writeValueAsString(newDatabase.getProperties()));
                 pstmt.execute();
-
+                super.alterDatabase(databaseName, newDatabase, ignoreIfNotExists);
             } catch (SQLException e) {
                 throw new ValidationException(
                         String.format("Failed drop database %s.", databaseName), e);
@@ -204,7 +204,6 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         } else if (!ignoreIfNotExists) {
             throw new DatabaseNotExistException(getName(), databaseName);
         }
-        super.alterDatabase(databaseName, newDatabase, ignoreIfNotExists);
     }
 
     // ------ tables and views ------
@@ -241,14 +240,14 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                                         catalogTable, tablePath.getObjectName(), false));
                 pstmt.setString(5, catalogTable.getComment());
                 pstmt.execute();
-
                 batchSaveColumns(tablePath, catalogTable, pstmt, conn);
                 conn.commit();
+
+                super.createTable(tablePath, table, ignoreIfExists);
             } catch (SQLException e) {
                 throw new ValidationException(
                         String.format("Failed drop database %s.", tablePath.getDatabaseName()), e);
             }
-            super.createTable(tablePath, table, ignoreIfExists);
         }
     }
 
@@ -295,10 +294,9 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 pstmt.setString(1, tablePath.getDatabaseName());
                 pstmt.setString(2, tablePath.getObjectName());
                 pstmt.execute();
-                super.dropTable(tablePath, ignoreIfNotExists);
-
                 conn.commit();
 
+                super.dropTable(tablePath, ignoreIfNotExists);
             } catch (SQLException e) {
                 throw new ValidationException(
                         String.format(
@@ -347,10 +345,9 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                     pstmt.setString(2, tablePath.getDatabaseName());
                     pstmt.setString(3, tablePath.getObjectName());
                     pstmt.execute();
+                    conn.commit();
 
                     super.renameTable(tablePath, newTableName, ignoreIfNotExists);
-
-                    conn.commit();
                 } catch (SQLException e) {
                     throw new ValidationException(
                             String.format(
