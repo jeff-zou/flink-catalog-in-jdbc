@@ -235,9 +235,15 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                         4,
                         table.getTableKind() == CatalogBaseTable.TableKind.TABLE
                                 ? ShowCreateUtils.buildShowCreateTableRow(
-                                        catalogTable, tablePath.getObjectName(), false)
+                                        catalogTable,
+                                        tablePath.getDatabaseName(),
+                                        tablePath.getObjectName(),
+                                        false)
                                 : ShowCreateUtils.buildShowCreateViewRow(
-                                        catalogTable, tablePath.getObjectName(), false));
+                                        catalogTable,
+                                        tablePath.getDatabaseName(),
+                                        tablePath.getObjectName(),
+                                        false));
                 pstmt.setString(5, catalogTable.getComment());
                 pstmt.execute();
                 batchSaveColumns(tablePath, catalogTable, pstmt, conn);
@@ -331,9 +337,15 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                             2,
                             catalogTable.getTableKind() == CatalogBaseTable.TableKind.TABLE
                                     ? ShowCreateUtils.buildShowCreateTableRow(
-                                            catalogTable, newTableName, false)
+                                            catalogTable,
+                                            tablePath.getDatabaseName(),
+                                            newTableName,
+                                            false)
                                     : ShowCreateUtils.buildShowCreateViewRow(
-                                            catalogTable, newTableName, false));
+                                            catalogTable,
+                                            tablePath.getDatabaseName(),
+                                            newTableName,
+                                            false));
                     pstmt.setString(3, tablePath.getDatabaseName());
                     pstmt.setString(4, tablePath.getObjectName());
                     pstmt.execute();
@@ -391,9 +403,15 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                         1,
                         newTable.getTableKind() == CatalogBaseTable.TableKind.TABLE
                                 ? ShowCreateUtils.buildShowCreateTableRow(
-                                        catalogTable, tablePath.getObjectName(), false)
+                                        catalogTable,
+                                        tablePath.getDatabaseName(),
+                                        tablePath.getObjectName(),
+                                        false)
                                 : ShowCreateUtils.buildShowCreateViewRow(
-                                        catalogTable, tablePath.getObjectName(), false));
+                                        catalogTable,
+                                        tablePath.getDatabaseName(),
+                                        tablePath.getObjectName(),
+                                        false));
                 pstmt.execute();
                 super.alterTable(tablePath, newTable, ignoreIfNotExists);
             } catch (SQLException e) {
@@ -602,6 +620,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                                 objectMapper.readValue(resultSet.getString(3), Map.class);
                 CatalogDatabase catalogDatabase =
                         new CatalogDatabaseImpl(properties, resultSet.getString(2));
+                flinkParser.createDatabase(resultSet.getString(1), catalogDatabase);
                 super.createDatabase(resultSet.getString(1), catalogDatabase, true);
             }
             resultSet.close();
@@ -618,7 +637,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 ObjectPath objectPath =
                         new ObjectPath(resultSet.getString(1), resultSet.getString(2));
                 super.createTable(
-                        objectPath, flinkParser.getTable(objectPath.getObjectName()), false);
+                        objectPath,
+                        flinkParser.getTable(
+                                objectPath.getDatabaseName(), objectPath.getObjectName()),
+                        false);
             }
             resultSet.close();
 

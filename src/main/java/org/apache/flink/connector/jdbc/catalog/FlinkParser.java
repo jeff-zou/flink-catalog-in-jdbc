@@ -6,6 +6,7 @@ import org.apache.flink.table.api.SqlDialect;
 import org.apache.flink.table.api.TableConfig;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.FunctionCatalog;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
@@ -120,6 +121,17 @@ public class FlinkParser {
         return SqlToOperationConverter.convert(planner, catalogManager, node).get();
     }
 
+    public void createDatabase(String databaseName, CatalogDatabase catalogDatabase) {
+        try {
+            catalogManager
+                    .getCatalog(CATALOG_NAME)
+                    .get()
+                    .createDatabase(databaseName, catalogDatabase, true);
+        } catch (Exception e) {
+
+        }
+    }
+
     public void creatTable(CreateTableOperation createTableOperation) {
         catalogManager.createTable(
                 createTableOperation.getCatalogTable(),
@@ -127,9 +139,9 @@ public class FlinkParser {
                 createTableOperation.isIgnoreIfExists());
     }
 
-    public CatalogBaseTable getTable(String objectName)
+    public CatalogBaseTable getTable(String databaseName, String objectName)
             throws TableNotExistException, CatalogException {
-        ObjectPath objectPath = new ObjectPath(DATABASE_NAME, objectName);
+        ObjectPath objectPath = new ObjectPath(databaseName, objectName);
         return catalogManager.getCatalog(CATALOG_NAME).get().getTable(objectPath);
     }
 
