@@ -9,7 +9,7 @@ Development environment engineering direct reference:
 <dependency>
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.2</version>
+    <version>1.4</version>
 </dependency>
 ```
 
