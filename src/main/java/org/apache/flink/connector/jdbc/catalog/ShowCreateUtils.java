@@ -144,7 +144,7 @@ public class ShowCreateUtils {
                         .collect(Collectors.joining(", "));
     }
 
-    static String buildShowCreateTableRow(
+    public static String buildShowCreateTableRow(
             ResolvedCatalogBaseTable<?> table,
             String databaseName,
             String tableName,
@@ -195,7 +195,7 @@ public class ShowCreateUtils {
         }
     }
 
-    static String buildShowCreateViewRow(
+    public static String buildShowCreateViewRow(
             ResolvedCatalogBaseTable<?> view,
             String databaseName,
             String tableName,

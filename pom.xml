@@ -6,7 +6,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.4</version>
+    <version>1.5</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -38,20 +38,20 @@
         </dependency>
         <!-- Postgres -->
 
-        <dependency>
+<!--        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>${postgres.version}</version>
             <scope>provided</scope>
-        </dependency>
+        </dependency>-->
 
         <!-- Oracle -->
-        <dependency>
+<!--        <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc8</artifactId>
             <version>${oracle.version}</version>
             <scope>provided</scope>
-        </dependency>
+        </dependency>-->
 
         <!-- Tests -->
 
@@ -88,14 +88,6 @@
 
         <dependency>
             <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-planner_${scala.binary.version}</artifactId>
-            <version>${flink.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.flink</groupId>
             <artifactId>flink-table-api-scala-bridge_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
             <scope>test</scope>
@@ -104,7 +96,7 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-table-planner_${scala.binary.version}</artifactId>
             <version>${flink.version}</version>
-            <scope>test</scope>
+            <scope>provided</scope>
         </dependency>
 
         <!-- MySQL tests -->
@@ -114,15 +106,6 @@
             <version>8.0.27</version>
             <scope>test</scope>
         </dependency>
-
-
-        <dependency>
-            <groupId>org.apache.flink</groupId>
-            <artifactId>flink-table-planner_${scala.binary.version}</artifactId>
-            <version>${flink.version}</version>
-            <scope>provided</scope>
-        </dependency>
-
 
     </dependencies>
 
