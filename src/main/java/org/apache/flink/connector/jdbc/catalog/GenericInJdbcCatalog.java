@@ -274,7 +274,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             pstmt.setString(2, tablePath.getObjectName());
             pstmt.setString(3, column.getName());
             pstmt.setString(4, column.getDataType().toString());
-            pstmt.setString(5, column.getComment().orElse(""));
+            pstmt.setString(5, "");
             pstmt.addBatch();
         }
         pstmt.executeBatch();

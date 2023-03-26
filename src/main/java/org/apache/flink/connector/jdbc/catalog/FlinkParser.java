@@ -56,9 +56,7 @@ public class FlinkParser {
 
     private final PlannerContext plannerContext =
             new PlannerContext(
-                    false,
                     tableConfig,
-                    new ModuleManager(),
                     functionCatalog,
                     catalogManager,
                     asRootSchema(new CatalogManagerCalciteSchema(catalogManager, isStreamingMode)),
