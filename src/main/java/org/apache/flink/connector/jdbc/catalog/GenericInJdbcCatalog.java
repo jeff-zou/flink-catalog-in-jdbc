@@ -77,6 +77,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     private final String url;
     private ObjectMapper objectMapper;
     private FlinkParser flinkParser;
+    private boolean hasLoaded = false;
 
     public GenericInJdbcCatalog(
             String catalogName, String defaultDatabase, String username, String pwd, String url) {
@@ -101,6 +102,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
     @Override
     public void open() throws CatalogException {
+        if (hasLoaded) {
+            return;
+        }
+
         try {
             load(objectMapper);
         } catch (Exception e1) {
@@ -110,6 +115,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
         super.open();
         LOG.info("Catalog {} established connection to {}", getName(), url);
+        hasLoaded = true;
     }
 
     @Override
