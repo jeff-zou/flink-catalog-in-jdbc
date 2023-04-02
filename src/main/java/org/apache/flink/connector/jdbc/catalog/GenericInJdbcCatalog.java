@@ -155,7 +155,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
                             conn.prepareStatement(
-                                    "delete from  flink_catalog_tables where database_name = ?");
+                                    "delete from  flink_catalog_databases where database_name = ?");
                     pstmt.setString(1, databaseName);
                     pstmt.execute();
                     super.dropDatabase(databaseName, ignoreIfNotExists, cascade);

@@ -14,7 +14,7 @@
         <postgres.version>42.2.10</postgres.version>
         <oracle.version>19.3.0.0</oracle.version>
         <otj-pg-embedded.version>0.13.4</otj-pg-embedded.version>
-        <flink.version>1.15.1</flink.version>
+        <flink.version>1.16.1</flink.version>
         <scala.binary.version>2.12</scala.binary.version>
     </properties>
 
