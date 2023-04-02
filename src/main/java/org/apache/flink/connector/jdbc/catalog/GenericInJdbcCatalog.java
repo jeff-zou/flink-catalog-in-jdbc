@@ -77,6 +77,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     private final String url;
     private ObjectMapper objectMapper;
     private FlinkParser flinkParser;
+    private boolean hasLoaded = false;
 
     public GenericInJdbcCatalog(
             String catalogName, String defaultDatabase, String username, String pwd, String url) {
@@ -101,6 +102,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
     @Override
     public void open() throws CatalogException {
+        if (hasLoaded) {
+            return;
+        }
+
         try {
             load(objectMapper);
         } catch (Exception e1) {
@@ -110,6 +115,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
         super.open();
         LOG.info("Catalog {} established connection to {}", getName(), url);
+        hasLoaded = true;
     }
 
     @Override
@@ -155,7 +161,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
                             conn.prepareStatement(
-                                    "delete from  flink_catalog_tables where database_name = ?");
+                                    "delete from  flink_catalog_databasess where database_name = ?");
                     pstmt.setString(1, databaseName);
                     pstmt.execute();
                     super.dropDatabase(databaseName, ignoreIfNotExists, cascade);
