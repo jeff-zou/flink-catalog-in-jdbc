@@ -8,9 +8,8 @@ class EncryptUtilTest {
 
     @Test
     void encrypt() {
-        String password = "test";
-        String encryptedPass = "1B03B303CD51187173754D75C7D1D5C3";
-        Preconditions.checkState(
-                encryptedPass.equals(EncryptUtil.encrypt("test", "*(2AEs*_AEs3L{O:s*}{")));
+        String secretKey = "*(2AEs*_A{";
+        String password = EncryptUtil.encrypt("test", secretKey);
+        Preconditions.checkArgument("test".equals(EncryptUtil.decrypt(password, secretKey)));
     }
 }

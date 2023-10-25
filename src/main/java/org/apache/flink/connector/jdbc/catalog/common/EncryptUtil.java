@@ -1,5 +1,6 @@
 package org.apache.flink.connector.jdbc.catalog.common;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +26,8 @@ public class EncryptUtil {
      * @return 密文字符串
      */
     public static String encrypt(String content, String secretKey) {
-        byte[] bytes = encryptToBytes(content, secretKey == null ? SECRET_KEY : secretKey);
+        byte[] bytes =
+                encryptToBytes(content, StringUtils.isEmpty(secretKey) ? SECRET_KEY : secretKey);
         return parseByte2HexStr(bytes);
     }
 
@@ -58,7 +60,8 @@ public class EncryptUtil {
     public static String decrypt(String content, String secretKey) {
         byte[] result =
                 decryptFromBytes(
-                        parseHexStr2Byte(content), secretKey == null ? SECRET_KEY : secretKey);
+                        parseHexStr2Byte(content),
+                        StringUtils.isEmpty(secretKey) ? SECRET_KEY : secretKey);
         return new String(result);
     }
 

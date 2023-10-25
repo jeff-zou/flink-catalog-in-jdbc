@@ -18,10 +18,20 @@ import java.sql.Statement;
  */
 public class GenericInJdbcCatalogTest {
 
+    private static final String DB_USERNAME = "username";
+    private static final String DB_PASSWORD = "password";
+    private static final String DB_URL = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1";
+
     private static final String CREATE_CATALOG =
             "create catalog  my_catalog with ("
-                    + "'type'='generic_in_jdbc', 'default-database'='default', 'username'='username', 'password'='password','secret.key'='test',"
-                    + " 'url'='jdbc:h2:mem:test;DB_CLOSE_DELAY=-1')";
+                    + "'type'='generic_in_jdbc', 'default-database'='default', 'username'='"
+                    + DB_USERNAME
+                    + "', 'password'='"
+                    + DB_PASSWORD
+                    + "','secret.key'='test',"
+                    + " 'url'='"
+                    + DB_URL
+                    + "')";
 
     private static final String CREATE_DATABASE = "create database if not exists my_database";
 
@@ -52,9 +62,7 @@ public class GenericInJdbcCatalogTest {
     @BeforeClass
     public static void initDatabase() throws Exception {
 
-        try (Connection conn =
-                DriverManager.getConnection(
-                        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", "username", "password")) {
+        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
             Statement statement = conn.createStatement();
             statement.executeUpdate(
                     "CREATE TABLE `flink_catalog_databases` (\n"
@@ -109,8 +117,7 @@ public class GenericInJdbcCatalogTest {
         tEnv.executeSql(CREATE_DATABASE);
 
         try (Connection connection =
-                DriverManager.getConnection(
-                        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", "username", "password")) {
+                DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
             Statement statement = connection.createStatement();
             ResultSet resultSet =
                     statement.executeQuery(
@@ -150,8 +157,7 @@ public class GenericInJdbcCatalogTest {
         tableResult.print();
 
         try (Connection connection =
-                DriverManager.getConnection(
-                        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", "username", "password")) {
+                DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
             Statement statement = connection.createStatement();
             ResultSet resultSet =
                     statement.executeQuery(
@@ -215,8 +221,7 @@ public class GenericInJdbcCatalogTest {
         tEnv.executeSql("use my_database");
         tEnv.executeSql("create function test as 'com.xsj.realtime.udx.Test'");
         try (Connection connection =
-                DriverManager.getConnection(
-                        "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1", "username", "password")) {
+                DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
             Statement statement = connection.createStatement();
             ResultSet resultSet =
                     statement.executeQuery(
