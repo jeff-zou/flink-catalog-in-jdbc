@@ -18,6 +18,15 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
+import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
+import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
+import org.apache.flink.connector.jdbc.catalog.common.FlinkParser;
+import org.apache.flink.connector.jdbc.catalog.common.ShowCreateUtils;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogDatabase;
@@ -49,10 +58,6 @@ import org.apache.flink.table.functions.FunctionIdentifier;
 import org.apache.flink.table.operations.ddl.CreateTableOperation;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
-
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,9 +68,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A generic catalog implementation that holds all meta objects in jdbc. */
 public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
@@ -79,8 +81,17 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     private FlinkParser flinkParser;
     private boolean hasLoaded = false;
 
+    private final String catalogName;
+
+    private final String secretKey;
+
     public GenericInJdbcCatalog(
-            String catalogName, String defaultDatabase, String username, String pwd, String url) {
+            String catalogName,
+            String defaultDatabase,
+            String username,
+            String pwd,
+            String url,
+            String secretKey) {
         super(catalogName, defaultDatabase);
 
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(username));
@@ -88,16 +99,17 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(url));
 
         validateJdbcUrl(url);
-
+        this.catalogName = catalogName;
         this.username = username;
         this.pwd = pwd;
         this.url = url;
+        this.secretKey = secretKey;
         objectMapper = new ObjectMapper();
     }
 
     private void validateJdbcUrl(String url) {
         String[] parts = url.trim().split("\\/+");
-        Preconditions.checkArgument(parts.length == 3);
+        //        Preconditions.checkArgument(parts.length == 3);
     }
 
     @Override
@@ -139,10 +151,11 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
             PreparedStatement pstmt =
                     conn.prepareStatement(
-                            "insert into flink_catalog_databases (database_name, comment, properties ) values (?, ?, ?)");
+                            "insert into flink_catalog_databases (database_name, comment, properties,catalog_name ) values (?, ?, ?, ?)");
             pstmt.setString(1, databaseName);
             pstmt.setString(2, database.getComment());
             pstmt.setString(3, objectMapper.writeValueAsString(database.getProperties()));
+            pstmt.setString(4, catalogName);
             pstmt.execute();
             super.createDatabase(databaseName, database, ignoreIfExists);
         } catch (SQLException e) {
@@ -161,8 +174,9 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
                             conn.prepareStatement(
-                                    "delete from  flink_catalog_databases where database_name = ?");
+                                    "delete from  flink_catalog_databases where database_name = ? and catalog_name=?");
                     pstmt.setString(1, databaseName);
+                    pstmt.setString(2, catalogName);
                     pstmt.execute();
                     super.dropDatabase(databaseName, ignoreIfNotExists, cascade);
                 } catch (SQLException e) {
@@ -195,10 +209,11 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "insert into flink_catalog_databases (database_name, comment, properties ) values (?, ?, ?)");
+                                "insert into flink_catalog_databases (database_name, comment, properties, catalog_name ) values (?, ?, ?, ?)");
                 pstmt.setString(1, databaseName);
                 pstmt.setString(2, newDatabase.getComment());
                 pstmt.setString(3, objectMapper.writeValueAsString(newDatabase.getProperties()));
+                pstmt.setString(4, catalogName);
                 pstmt.execute();
                 super.alterDatabase(databaseName, newDatabase, ignoreIfNotExists);
             } catch (SQLException e) {
@@ -231,9 +246,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 conn.setAutoCommit(false);
                 ResolvedCatalogTable catalogTable = (ResolvedCatalogTable) table;
+                String password = DesensitiveUtil.desensitiveForProperties(table.getOptions());
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "insert into flink_catalog_tables (database_name, object_name, kind, script, comment) values (?, ?, ?, ?, ? )");
+                                "insert into flink_catalog_tables (database_name, object_name, kind, script, comment, `password`, catalog_name) values (?, ?, ?, ?, ?, ?, ?)");
                 pstmt.setString(1, tablePath.getDatabaseName());
                 pstmt.setString(2, tablePath.getObjectName());
                 pstmt.setString(3, table.getTableKind().name());
@@ -251,6 +267,9 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                                         tablePath.getObjectName(),
                                         false));
                 pstmt.setString(5, catalogTable.getComment());
+                pstmt.setString(
+                        6, password == null ? null : EncryptUtil.encrypt(password, secretKey));
+                pstmt.setString(7, catalogName);
                 pstmt.execute();
                 batchSaveColumns(tablePath, catalogTable, pstmt, conn);
                 conn.commit();
@@ -271,7 +290,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             throws SQLException {
         pstmt =
                 conn.prepareStatement(
-                        "insert into flink_catalog_columns (database_name, object_name, column_name , column_type, column_comment) values (?, ?, ?, ?, ? )");
+                        "insert into flink_catalog_columns (database_name, object_name, column_name , column_type, column_comment, catalog_name) values (?, ?, ?, ?, ?, ? )");
 
         List<Column> columns = resolvedCatalogTable.getResolvedSchema().getColumns();
 
@@ -281,6 +300,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             pstmt.setString(3, column.getName());
             pstmt.setString(4, column.getDataType().toString());
             pstmt.setString(5, column.getComment().orElse(""));
+            pstmt.setString(6, catalogName);
             pstmt.addBatch();
         }
         pstmt.executeBatch();
@@ -295,16 +315,18 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 conn.setAutoCommit(false);
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "delete from flink_catalog_tables where database_name = ? and  object_name = ?");
+                                "delete from flink_catalog_tables where database_name = ? and  object_name = ? and catalog_name = ?");
                 pstmt.setString(1, tablePath.getDatabaseName());
                 pstmt.setString(2, tablePath.getObjectName());
+                pstmt.setString(3, catalogName);
                 pstmt.execute();
 
                 pstmt =
                         conn.prepareStatement(
-                                "delete from flink_catalog_columns where database_name = ? and  object_name = ?");
+                                "delete from flink_catalog_columns where database_name = ? and  object_name = ? and catalog_name = ?");
                 pstmt.setString(1, tablePath.getDatabaseName());
                 pstmt.setString(2, tablePath.getObjectName());
+                pstmt.setString(3, catalogName);
                 pstmt.execute();
                 conn.commit();
 
@@ -336,7 +358,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                     conn.setAutoCommit(false);
                     PreparedStatement pstmt =
                             conn.prepareStatement(
-                                    "update flink_catalog_tables set object_name=?, script = ? where database_name = ? and  object_name = ?");
+                                    "update flink_catalog_tables set object_name=?, script = ? where database_name = ? and  object_name = ? and catalog_name = ?");
                     pstmt.setString(1, newTableName);
                     ResolvedCatalogTable catalogTable = (ResolvedCatalogTable) catalogBaseTable;
                     pstmt.setString(
@@ -354,14 +376,16 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                                             false));
                     pstmt.setString(3, tablePath.getDatabaseName());
                     pstmt.setString(4, tablePath.getObjectName());
+                    pstmt.setString(5, catalogName);
                     pstmt.execute();
 
                     pstmt =
                             conn.prepareStatement(
-                                    "update flink_catalog_columns set object_name=? where database_name = ? and  object_name = ?");
+                                    "update flink_catalog_columns set object_name=? where database_name = ? and  object_name = ? and catalog_name = ?");
                     pstmt.setString(1, newTableName);
                     pstmt.setString(2, tablePath.getDatabaseName());
                     pstmt.setString(3, tablePath.getObjectName());
+                    pstmt.setString(4, catalogName);
                     pstmt.execute();
                     conn.commit();
 
@@ -401,7 +425,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "update flink_catalog_tables set script = ? where database_name = ? and object_name= ?");
+                                "update flink_catalog_tables set script = ? where database_name = ? and object_name= ? and catalog_name = ?");
                 pstmt.setString(2, tablePath.getDatabaseName());
                 pstmt.setString(3, tablePath.getObjectName());
                 ResolvedCatalogTable catalogTable = (ResolvedCatalogTable) newTable;
@@ -418,6 +442,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                                         tablePath.getDatabaseName(),
                                         tablePath.getObjectName(),
                                         false));
+                pstmt.setString(4, catalogName);
                 pstmt.execute();
                 super.alterTable(tablePath, newTable, ignoreIfNotExists);
             } catch (SQLException e) {
@@ -440,8 +465,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             CatalogPartitionSpec partitionSpec,
             CatalogPartition partition,
             boolean ignoreIfExists)
-            throws TableNotExistException, TableNotPartitionedException,
-                    PartitionSpecInvalidException, PartitionAlreadyExistsException,
+            throws TableNotExistException,
+                    TableNotPartitionedException,
+                    PartitionSpecInvalidException,
+                    PartitionAlreadyExistsException,
                     CatalogException {
         throw new UnsupportedOperationException();
     }
@@ -481,11 +508,12 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
                             conn.prepareStatement(
-                                    "insert into flink_catalog_functions (database_name, object_name,  class_name, function_language ) values (?, ?, ?, ?)");
+                                    "insert into flink_catalog_functions (database_name, object_name,  class_name, function_language, catalog_name ) values (?, ?, ?, ?, ?)");
                     pstmt.setString(1, path.getDatabaseName());
                     pstmt.setString(2, path.getObjectName());
                     pstmt.setString(3, function.getClassName());
                     pstmt.setString(4, function.getFunctionLanguage().name());
+                    pstmt.setString(5, catalogName);
                     pstmt.execute();
                     super.createFunction(path, function, ignoreIfExists);
                 } catch (SQLException e) {
@@ -522,12 +550,12 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "update flink_catalog_functions set class_name = ?, function_language =? where database_name = ? and object_name = ?");
+                                "update flink_catalog_functions set class_name = ?, function_language =? where database_name = ? and object_name = ? and catalog_name = ?");
                 pstmt.setString(1, newFunction.getClassName());
                 pstmt.setString(2, newFunction.getFunctionLanguage().name());
                 pstmt.setString(3, path.getDatabaseName());
                 pstmt.setString(4, path.getObjectName());
-
+                pstmt.setString(5, catalogName);
                 pstmt.execute();
                 super.alterFunction(path, newFunction, ignoreIfNotExists);
             } catch (SQLException e) {
@@ -553,9 +581,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 PreparedStatement pstmt =
                         conn.prepareStatement(
-                                "delete from flink_catalog_functions where database_name = ? and object_name =? ");
+                                "delete from flink_catalog_functions where database_name = ? and object_name =? and catalog_name = ?");
                 pstmt.setString(1, path.getDatabaseName());
                 pstmt.setString(2, path.getObjectName());
+                pstmt.setString(3, catalogName);
                 pstmt.execute();
                 super.dropFunction(path, ignoreIfNotExists);
             } catch (SQLException e) {
@@ -618,7 +647,8 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             // create databases in memory
             PreparedStatement pstmt =
                     conn.prepareStatement(
-                            "select database_name, comment, properties from  flink_catalog_databases");
+                            "select database_name, comment, properties from  flink_catalog_databases where catalog_name = ? ");
+            pstmt.setString(1, catalogName);
             ResultSet resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 Map<String, String> properties =
@@ -634,11 +664,19 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             // create table in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name, kind, script  from  flink_catalog_tables");
+                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ?");
+            pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 CreateTableOperation createTableOperation =
                         (CreateTableOperation) flinkParser.parse(resultSet.getString(4));
+
+                if (!StringUtils.isNullOrWhitespaceOnly(resultSet.getString(5))) {
+                    String password = EncryptUtil.decrypt(resultSet.getString(5), secretKey);
+                    DesensitiveUtil.sensitiveForProperties(
+                            password, createTableOperation.getCatalogTable().getOptions());
+                }
+
                 flinkParser.creatTable(createTableOperation);
                 ObjectPath objectPath =
                         new ObjectPath(resultSet.getString(1), resultSet.getString(2));
@@ -653,7 +691,8 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             // craete function in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name,  class_name, function_language from flink_catalog_functions");
+                            "select database_name, object_name,  class_name, function_language from flink_catalog_functions where catalog_name = ?");
+            pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 CatalogFunction catalogFunction =

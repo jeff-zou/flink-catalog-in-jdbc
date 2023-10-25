@@ -29,19 +29,24 @@ import org.apache.flink.table.catalog.CommonCatalogOptions;
 @Internal
 public class GenericInJdbcCatalogFactoryOptions {
 
-  public static final String IDENTIFIER = "generic_in_jdbc";
+    public static final String IDENTIFIER = "generic_in_jdbc";
 
-  public static final ConfigOption<String> DEFAULT_DATABASE =
-      ConfigOptions.key(CommonCatalogOptions.DEFAULT_DATABASE_KEY).stringType().noDefaultValue();
+    public static final ConfigOption<String> DEFAULT_DATABASE =
+            ConfigOptions.key(CommonCatalogOptions.DEFAULT_DATABASE_KEY)
+                    .stringType()
+                    .noDefaultValue();
 
-  public static final ConfigOption<String> USERNAME =
-      ConfigOptions.key("username").stringType().noDefaultValue();
+    public static final ConfigOption<String> USERNAME =
+            ConfigOptions.key("username").stringType().noDefaultValue();
 
-  public static final ConfigOption<String> PASSWORD =
-      ConfigOptions.key("password").stringType().noDefaultValue();
+    public static final ConfigOption<String> PASSWORD =
+            ConfigOptions.key("password").stringType().noDefaultValue();
 
-  public static final ConfigOption<String> URL =
-      ConfigOptions.key("url").stringType().noDefaultValue();
+    public static final ConfigOption<String> URL =
+            ConfigOptions.key("url").stringType().noDefaultValue();
 
-  private GenericInJdbcCatalogFactoryOptions() {}
+    public static final ConfigOption<String> SECRET_KEY =
+            ConfigOptions.key("secret.key").stringType().noDefaultValue();
+
+    private GenericInJdbcCatalogFactoryOptions() {}
 }
