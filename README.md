@@ -1,7 +1,7 @@
 ### Instructions for use：
 
-After executing mvn package -DskipTests on the command line, import the generated package
-flink-catalog-in-jdbc-1.0.jar into flink lib, no other settings are required.
+After executing mvn package on the command line, import the generated package
+flink-catalog-in-jdbc-1.7.jar into flink(support flink 1.16) lib, no other settings are required.
 
 Development environment engineering direct reference:
 
@@ -10,6 +10,15 @@ Development environment engineering direct reference:
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
     <version>1.7</version>
+</dependency>
+```
+
+if your flink's version is 1.15:
+```
+<dependency>
+    <groupId>io.github.jeff-zou</groupId>
+    <artifactId>flink-catalog-in-jdbc</artifactId>
+    <version>1.7-flink-1.15</version>
 </dependency>
 ```
 
