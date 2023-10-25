@@ -1,5 +1,6 @@
 package org.apache.flink.connector.jdbc.catalog;
 
+import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;

@@ -1,4 +1,4 @@
-package org.apache.flink.connector.jdbc.catalog;
+package org.apache.flink.connector.jdbc.catalog.common;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +93,7 @@ public class EncryptUtil {
         }
         SecretKeySpec key2 = null;
         SecureRandom random = SecureRandom.getInstance("SHA1PRNG");
+        key = key + "AB@1#";
         random.setSeed(key.getBytes());
         KeyGenerator kgen = KeyGenerator.getInstance("AES");
         kgen.init(128, random);

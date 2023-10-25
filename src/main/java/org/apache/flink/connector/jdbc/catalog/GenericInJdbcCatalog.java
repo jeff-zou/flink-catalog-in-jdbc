@@ -21,6 +21,10 @@ package org.apache.flink.connector.jdbc.catalog;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 
+import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
+import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
+import org.apache.flink.connector.jdbc.catalog.common.FlinkParser;
+import org.apache.flink.connector.jdbc.catalog.common.ShowCreateUtils;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.ValidationException;

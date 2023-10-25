@@ -1,4 +1,4 @@
-package org.apache.flink.connector.jdbc.catalog;
+package org.apache.flink.connector.jdbc.catalog.common;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.api.TableException;

@@ -1,5 +1,8 @@
-package org.apache.flink.connector.jdbc.catalog;
+package org.apache.flink.connector.jdbc.catalog.common;
 
+import static org.apache.calcite.jdbc.CalciteSchemaBuilder.asRootSchema;
+
+import org.apache.calcite.sql.SqlNode;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.SqlDialect;
@@ -26,14 +29,10 @@ import org.apache.flink.table.planner.operations.SqlToOperationConverter;
 import org.apache.flink.table.planner.parse.CalciteParser;
 import org.apache.flink.table.resource.ResourceManager;
 
-import org.apache.calcite.sql.SqlNode;
-
 import java.net.URL;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Supplier;
-
-import static org.apache.calcite.jdbc.CalciteSchemaBuilder.asRootSchema;
 
 /**
  * @Author: Jeff Zou @Date: 2022/8/8 17:13

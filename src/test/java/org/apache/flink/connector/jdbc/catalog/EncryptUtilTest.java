@@ -1,7 +1,6 @@
 package org.apache.flink.connector.jdbc.catalog;
 
-import static org.junit.jupiter.api.Assertions.*;
-
+import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
 import org.apache.flink.util.Preconditions;
 import org.junit.jupiter.api.Test;
 

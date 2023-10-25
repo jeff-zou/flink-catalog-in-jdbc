@@ -1,4 +1,4 @@
-package org.apache.flink.connector.jdbc.catalog;
+package org.apache.flink.connector.jdbc.catalog.common;
 
 import java.util.Map;
 
