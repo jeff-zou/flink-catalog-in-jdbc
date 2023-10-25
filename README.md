@@ -93,10 +93,10 @@ CREATE TABLE if not exists `test` (
                     
  show create table test;                   
 ```
-参数说明</br>
+Parameter Description</br>
 
-| 参数名        | 说明                                         |
+| Parameter  | Description                                |
 |------------|--------------------------------------------|
-| username   | 数据库用户名                                     |
-| password   | 数据库密码                                      |
-| secret.key | 元数据中的密码加密保存时使用的密钥，有数据保存后请不要修改此值，否则将无法还原元数据 |
+| username   | the username of DB                         |
+| password   | the password of DB                         |
+| secret.key | The key used for encrypting the password in the metadata should not be modified after the data is saved, otherwise the metadata cannot be restored. |
