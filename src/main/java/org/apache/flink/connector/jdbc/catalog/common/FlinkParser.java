@@ -27,9 +27,7 @@ import org.apache.flink.table.planner.delegation.ParserImpl;
 import org.apache.flink.table.planner.delegation.PlannerContext;
 import org.apache.flink.table.planner.operations.SqlToOperationConverter;
 import org.apache.flink.table.planner.parse.CalciteParser;
-import org.apache.flink.table.resource.ResourceManager;
 
-import java.net.URL;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -41,21 +39,19 @@ public class FlinkParser {
     private static final String CATALOG_NAME = "catalogLoader";
     private static final String DATABASE_NAME = "default";
     private final boolean isStreamingMode = true;
-    private final TableConfig tableConfig = TableConfig.getDefault();
+    private final TableConfig tableConfig = new TableConfig();
     private final Catalog catalog = new GenericInMemoryCatalog(CATALOG_NAME, DATABASE_NAME);
     private final CatalogManager catalogManager =
             preparedCatalogManager().defaultCatalog(CATALOG_NAME, catalog).build();
     private final ModuleManager moduleManager = new ModuleManager();
-
-    ResourceManager resourceManager =
-            ResourceManager.createResourceManager(
-                    new URL[0],
-                    Thread.currentThread().getContextClassLoader(),
-                    tableConfig.getConfiguration());
     private final FunctionCatalog functionCatalog =
-            new FunctionCatalog(tableConfig, resourceManager, catalogManager, moduleManager);
+            new FunctionCatalog(tableConfig, catalogManager, moduleManager);
     private final Supplier<FlinkPlannerImpl> plannerSupplier =
-            () -> getPlannerContext().createFlinkPlanner();
+            () ->
+                    getPlannerContext()
+                            .createFlinkPlanner(
+                                    catalogManager.getCurrentCatalog(),
+                                    catalogManager.getCurrentDatabase());
 
     private final PlannerContext plannerContext =
             new PlannerContext(
@@ -65,15 +61,14 @@ public class FlinkParser {
                     functionCatalog,
                     catalogManager,
                     asRootSchema(new CatalogManagerCalciteSchema(catalogManager, isStreamingMode)),
-                    Collections.emptyList(),
-                    Thread.currentThread().getContextClassLoader());
+                    Collections.emptyList());
 
     private final Parser parser =
             new ParserImpl(
                     catalogManager,
                     plannerSupplier,
                     () -> plannerSupplier.get().parser(),
-                    plannerContext.getRexFactory());
+                    plannerContext.getSqlExprToRexConverterFactory());
 
     private FlinkPlannerImpl planner;
     private CalciteParser calciteParser;
@@ -85,8 +80,7 @@ public class FlinkParser {
     public FlinkParser() {
         ExpressionResolver.ExpressionResolverBuilder builder =
                 ExpressionResolver.resolverFor(
-                        TableConfig.getDefault(),
-                        Thread.currentThread().getContextClassLoader(),
+                        new TableConfig(),
                         name -> Optional.empty(),
                         functionCatalog.asLookup(parser::parseIdentifier),
                         catalogManager.getDataTypeFactory(),
@@ -108,7 +102,8 @@ public class FlinkParser {
 
     private FlinkPlannerImpl getPlannerBySqlDialect(SqlDialect sqlDialect) {
         tableConfig.setSqlDialect(sqlDialect);
-        return plannerContext.createFlinkPlanner();
+        return plannerContext.createFlinkPlanner(
+                catalogManager.getCurrentCatalog(), catalogManager.getCurrentDatabase());
     }
 
     private CalciteParser getParserBySqlDialect(SqlDialect sqlDialect) {
