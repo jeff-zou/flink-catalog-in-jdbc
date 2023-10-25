@@ -95,8 +95,8 @@ CREATE TABLE if not exists `test` (
 ```
 Parameter Description</br>
 
-| Parameter  | Description                                |
-|------------|--------------------------------------------|
-| username   | the username of DB                         |
-| password   | the password of DB                         |
-| secret.key | The key used for encrypting the password in the metadata should not be modified after the data is saved, otherwise the metadata cannot be restored. |
+| Parameter  | Description                                                                                                                                                   |
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| username   | the username of DB                                                                                                                                            |
+| password   | the password of DB                                                                                                                                            |
+| secret.key | The key used for encrypting the password which in the metadata, it should not be modified after the data is saved, otherwise the metadata cannot be restored. |
