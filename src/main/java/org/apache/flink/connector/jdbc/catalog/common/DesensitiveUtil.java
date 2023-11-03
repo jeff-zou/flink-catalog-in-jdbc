@@ -6,10 +6,14 @@ public class DesensitiveUtil {
 
     public static final String DESENSITIVE_STRIGN = "******";
 
+    public static final String SENSITIVE_KEY_PASSWORD = "password";
+
+    public static final String SENSITIVE_KEY_SASL = "properties.sasl.jaas.config";
+
     public static String desensitiveForProperties(Map<String, String> properties) {
         String password = null;
         if (properties.get("connector").contains("kafka")) {
-            String sasl = properties.get("properties.sasl.jaas.config");
+            String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
                 int passwordStartIndex = sasl.indexOf("password=\"") + 10;
                 int passwordEndIndex = sasl.indexOf("\"", passwordStartIndex);
@@ -18,12 +22,12 @@ public class DesensitiveUtil {
                         sasl.substring(0, passwordStartIndex)
                                 + DESENSITIVE_STRIGN
                                 + sasl.substring(passwordEndIndex);
-                properties.put("properties.sasl.jaas.config", newSasl);
+                properties.put(SENSITIVE_KEY_SASL, newSasl);
             }
         } else {
-            password = properties.get("password");
+            password = properties.get(SENSITIVE_KEY_PASSWORD);
             if (password != null) {
-                properties.put("password", DESENSITIVE_STRIGN);
+                properties.put(SENSITIVE_KEY_PASSWORD, DESENSITIVE_STRIGN);
             }
         }
         return password;
@@ -31,15 +35,15 @@ public class DesensitiveUtil {
 
     public static boolean sensitiveForProperties(String password, Map<String, String> properties) {
         if (properties.get("connector").contains("kafka")) {
-            String sasl = properties.get("properties.sasl.jaas.config");
+            String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
                 sasl = sasl.replace(DESENSITIVE_STRIGN, password);
-                properties.put("properties.sasl.jaas.config", sasl);
+                properties.put(SENSITIVE_KEY_SASL, sasl);
                 return true;
             }
         } else {
-            if (properties.containsKey("password")) {
-                properties.put("password", password);
+            if (properties.containsKey(SENSITIVE_KEY_PASSWORD)) {
+                properties.put(SENSITIVE_KEY_PASSWORD, password);
                 return true;
             }
         }
