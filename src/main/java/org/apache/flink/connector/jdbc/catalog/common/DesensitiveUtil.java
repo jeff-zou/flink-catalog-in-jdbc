@@ -29,17 +29,20 @@ public class DesensitiveUtil {
         return password;
     }
 
-    public static void sensitiveForProperties(String password, Map<String, String> properties) {
+    public static boolean sensitiveForProperties(String password, Map<String, String> properties) {
         if (properties.get("connector").contains("kafka")) {
             String sasl = properties.get("properties.sasl.jaas.config");
             if (sasl != null) {
                 sasl = sasl.replace(DESENSITIVE_STRIGN, password);
                 properties.put("properties.sasl.jaas.config", sasl);
+                return true;
             }
         } else {
             if (properties.containsKey("password")) {
                 properties.put("password", password);
+                return true;
             }
         }
+        return false;
     }
 }
