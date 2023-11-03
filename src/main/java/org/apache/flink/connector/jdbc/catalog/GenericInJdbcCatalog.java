@@ -28,18 +28,7 @@ import org.apache.flink.connector.jdbc.catalog.common.ShowCreateUtils;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.core.JsonProcessingException;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.flink.table.api.ValidationException;
-import org.apache.flink.table.catalog.CatalogBaseTable;
-import org.apache.flink.table.catalog.CatalogDatabase;
-import org.apache.flink.table.catalog.CatalogDatabaseImpl;
-import org.apache.flink.table.catalog.CatalogFunction;
-import org.apache.flink.table.catalog.CatalogFunctionImpl;
-import org.apache.flink.table.catalog.CatalogPartition;
-import org.apache.flink.table.catalog.CatalogPartitionSpec;
-import org.apache.flink.table.catalog.Column;
-import org.apache.flink.table.catalog.FunctionLanguage;
-import org.apache.flink.table.catalog.GenericInMemoryCatalog;
-import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.catalog.*;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.DatabaseAlreadyExistException;
 import org.apache.flink.table.catalog.exceptions.DatabaseNotEmptyException;
@@ -245,7 +234,6 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         } else {
             try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                 conn.setAutoCommit(false);
-                ResolvedCatalogTable catalogTable = (ResolvedCatalogTable) table;
                 String password = DesensitiveUtil.desensitiveForProperties(table.getOptions());
                 PreparedStatement pstmt =
                         conn.prepareStatement(
@@ -257,21 +245,25 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                         4,
                         table.getTableKind() == CatalogBaseTable.TableKind.TABLE
                                 ? ShowCreateUtils.buildShowCreateTableRow(
-                                        catalogTable,
+                                        (ResolvedCatalogTable) table,
                                         tablePath.getDatabaseName(),
                                         tablePath.getObjectName(),
                                         false)
                                 : ShowCreateUtils.buildShowCreateViewRow(
-                                        catalogTable,
+                                        (ResolvedCatalogView) table,
                                         tablePath.getDatabaseName(),
                                         tablePath.getObjectName(),
                                         false));
-                pstmt.setString(5, catalogTable.getComment());
+                pstmt.setString(5, table.getComment());
                 pstmt.setString(
                         6, password == null ? null : EncryptUtil.encrypt(password, secretKey));
                 pstmt.setString(7, catalogName);
                 pstmt.execute();
-                batchSaveColumns(tablePath, catalogTable, pstmt, conn);
+                batchSaveColumns(
+                        tablePath,
+                        ((ResolvedCatalogBaseTable<?>) table).getResolvedSchema(),
+                        pstmt,
+                        conn);
                 conn.commit();
 
                 super.createTable(tablePath, table, ignoreIfExists);
@@ -284,7 +276,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
     private void batchSaveColumns(
             ObjectPath tablePath,
-            ResolvedCatalogTable resolvedCatalogTable,
+            ResolvedSchema resolvedSchema,
             PreparedStatement pstmt,
             Connection conn)
             throws SQLException {
@@ -292,7 +284,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 conn.prepareStatement(
                         "insert into flink_catalog_columns (database_name, object_name, column_name , column_type, column_comment, catalog_name) values (?, ?, ?, ?, ?, ? )");
 
-        List<Column> columns = resolvedCatalogTable.getResolvedSchema().getColumns();
+        List<Column> columns = resolvedSchema.getColumns();
 
         for (Column column : columns) {
             pstmt.setString(1, tablePath.getDatabaseName());
