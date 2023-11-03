@@ -41,8 +41,7 @@ public class GenericInJdbcCatalogTest {
                     + "  `id` INT NOT NULL,"
                     + "  `stime` TIMESTAMP(3),"
                     + " `cost` as id * 10, "
-                    + "  WATERMARK FOR `stime` AS `stime` - INTERVAL '10' SECOND,"
-                    + "  CONSTRAINT `PK_3386` PRIMARY KEY (`id`) NOT ENFORCED"
+                    + "  WATERMARK FOR `stime` AS `stime` - INTERVAL '10' SECOND"
                     + ") "
                     + " comment 'test' "
                     + " partitioned by (c1)"
@@ -50,6 +49,8 @@ public class GenericInJdbcCatalogTest {
                     + "  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"test\"  password=\"test\";',"
                     + "  'connector' = 'kafka',"
                     + "  'topic' = 'test',"
+                    + "  'properties.bootstrap.servers'='127.0.0.1:9093',"
+                    + "  'format'='json',"
                     + "  'properties.group.id' = 'test',"
                     + "  'properties.acks' = '0',"
                     + "  'properties.value.serializer' = 'org.apache.kafka.common.serialization.ByteArraySerializer',"
@@ -57,7 +58,7 @@ public class GenericInJdbcCatalogTest {
                     + ") ";
 
     private static final String ENCRYPTED_TEST_TABLE =
-            "CREATE TABLE my_database.test (    `c1` VARCHAR(2147483647),   `id` INT NOT NULL,   `stime` TIMESTAMP(3),   `cost` AS `id` * 10,   WATERMARK FOR `stime` AS `stime` - INTERVAL '10' SECOND,   CONSTRAINT `PK_3386` PRIMARY KEY (`id`) NOT ENFORCED ) COMMENT 'test'  PARTITIONED BY (`c1`) WITH (   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"test\"  password=\"******\";',   'connector' = 'kafka',   'topic' = 'test',   'properties.group.id' = 'test',   'properties.acks' = '0',   'properties.value.serializer' = 'org.apache.kafka.common.serialization.ByteArraySerializer',   'properties.enable.auto.commit' = 'true' ) ";
+            "CREATE TABLE my_database.test (    `c1` VARCHAR(2147483647),   `id` INT NOT NULL,   `stime` TIMESTAMP(3),   `cost` AS `id` * 10,   WATERMARK FOR `stime` AS `stime` - INTERVAL '10' SECOND ) COMMENT 'test'  PARTITIONED BY (`c1`) WITH (   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"test\"  password=\"******\";',   'properties.bootstrap.servers' = '127.0.0.1:9093',   'connector' = 'kafka',   'format' = 'json',   'topic' = 'test',   'properties.group.id' = 'test',   'properties.acks' = '0',   'properties.value.serializer' = 'org.apache.kafka.common.serialization.ByteArraySerializer',   'properties.enable.auto.commit' = 'true' ) ";
 
     @BeforeClass
     public static void initDatabase() throws Exception {
@@ -242,6 +243,69 @@ public class GenericInJdbcCatalogTest {
                 Preconditions.checkArgument(resultSet.getInt(1) == 0);
             }
             resultSet.close();
+        }
+    }
+
+    @Test
+    public void createAndDropView() throws Exception {
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql(CREATE_DATABASE);
+        tEnv.executeSql("use my_database");
+        tEnv.executeSql(CREATE_TEST_TABLE);
+        System.out.println("创建表成功：");
+
+        String createView =
+                "CREATE VIEW my_database.test_view(`c1`, `id`) as  SELECT `test`.`c1`, `test`.`id`  FROM `my_catalog`.`my_database`.`test`  WHERE `test`.`c1` = '2'";
+        tEnv.executeSql("create view test_view as select c1, id from test where c1 = '2'");
+        System.out.println("创建视图成功：");
+        try (Connection connection =
+                DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
+            Statement statement = connection.createStatement();
+            ResultSet resultSet =
+                    statement.executeQuery(
+                            "select script,password from flink_catalog_tables  where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+
+                String script =
+                        resultSet.getString(1).replaceAll("\\r", " ").replaceAll("\\n", " ");
+                Preconditions.checkArgument(createView.equals(script));
+            }
+            resultSet.close();
+
+            resultSet =
+                    statement.executeQuery(
+                            "select count(1) from flink_catalog_columns where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+                Preconditions.checkArgument(resultSet.getInt(1) == 2);
+            }
+
+            tEnv.executeSql("drop view test_view");
+
+            resultSet =
+                    statement.executeQuery(
+                            "select count(1) from flink_catalog_columns where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+                Preconditions.checkArgument(resultSet.getInt(1) == 0);
+            }
+            resultSet.close();
+
+            resultSet =
+                    statement.executeQuery(
+                            "select count(1) from flink_catalog_tables  where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+                Preconditions.checkArgument(resultSet.getInt(1) == 0);
+            }
+            resultSet.close();
+
+            System.out.println("删除视图成功");
         }
     }
 }

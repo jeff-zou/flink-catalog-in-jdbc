@@ -12,6 +12,10 @@ public class DesensitiveUtil {
 
     public static String desensitiveForProperties(Map<String, String> properties) {
         String password = null;
+        if (properties.size() == 0) {
+            return password;
+        }
+
         if (properties.get("connector").contains("kafka")) {
             String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
@@ -34,6 +38,10 @@ public class DesensitiveUtil {
     }
 
     public static boolean sensitiveForProperties(String password, Map<String, String> properties) {
+        if (properties.size() == 0) {
+            return false;
+        }
+
         if (properties.get("connector").contains("kafka")) {
             String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
