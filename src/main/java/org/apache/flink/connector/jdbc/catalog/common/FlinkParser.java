@@ -21,6 +21,7 @@ import org.apache.flink.table.expressions.resolver.ExpressionResolver;
 import org.apache.flink.table.module.ModuleManager;
 import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.CreateTableOperation;
+import org.apache.flink.table.operations.ddl.CreateViewOperation;
 import org.apache.flink.table.planner.calcite.FlinkPlannerImpl;
 import org.apache.flink.table.planner.catalog.CatalogManagerCalciteSchema;
 import org.apache.flink.table.planner.delegation.ParserImpl;
@@ -38,42 +39,9 @@ import java.util.function.Supplier;
  * @Author: Jeff Zou @Date: 2022/8/8 17:13
  */
 public class FlinkParser {
-    private static final String CATALOG_NAME = "catalogLoader";
+    private final String catalogName;
     private static final String DATABASE_NAME = "default";
     private final boolean isStreamingMode = true;
-    private final TableConfig tableConfig = TableConfig.getDefault();
-    private final Catalog catalog = new GenericInMemoryCatalog(CATALOG_NAME, DATABASE_NAME);
-    private final CatalogManager catalogManager =
-            preparedCatalogManager().defaultCatalog(CATALOG_NAME, catalog).build();
-    private final ModuleManager moduleManager = new ModuleManager();
-
-    ResourceManager resourceManager =
-            ResourceManager.createResourceManager(
-                    new URL[0],
-                    Thread.currentThread().getContextClassLoader(),
-                    tableConfig.getConfiguration());
-    private final FunctionCatalog functionCatalog =
-            new FunctionCatalog(tableConfig, resourceManager, catalogManager, moduleManager);
-    private final Supplier<FlinkPlannerImpl> plannerSupplier =
-            () -> getPlannerContext().createFlinkPlanner();
-
-    private final PlannerContext plannerContext =
-            new PlannerContext(
-                    false,
-                    tableConfig,
-                    new ModuleManager(),
-                    functionCatalog,
-                    catalogManager,
-                    asRootSchema(new CatalogManagerCalciteSchema(catalogManager, isStreamingMode)),
-                    Collections.emptyList(),
-                    Thread.currentThread().getContextClassLoader());
-
-    private final Parser parser =
-            new ParserImpl(
-                    catalogManager,
-                    plannerSupplier,
-                    () -> plannerSupplier.get().parser(),
-                    plannerContext.getRexFactory());
 
     private FlinkPlannerImpl planner;
     private CalciteParser calciteParser;
@@ -82,7 +50,48 @@ public class FlinkParser {
         return plannerContext;
     }
 
-    public FlinkParser() {
+    private final TableConfig tableConfig;
+
+    private final CatalogManager catalogManager;
+
+    private final PlannerContext plannerContext;
+
+    public FlinkParser(String catalogName) {
+        this.catalogName = catalogName;
+        tableConfig = TableConfig.getDefault();
+        final Catalog catalog = new GenericInMemoryCatalog(catalogName, DATABASE_NAME);
+        catalogManager =
+                preparedCatalogManager(catalogName).defaultCatalog(catalogName, catalog).build();
+        final ModuleManager moduleManager = new ModuleManager();
+
+        ResourceManager resourceManager =
+                ResourceManager.createResourceManager(
+                        new URL[0],
+                        Thread.currentThread().getContextClassLoader(),
+                        tableConfig.getConfiguration());
+        final FunctionCatalog functionCatalog =
+                new FunctionCatalog(tableConfig, resourceManager, catalogManager, moduleManager);
+        final Supplier<FlinkPlannerImpl> plannerSupplier =
+                () -> getPlannerContext().createFlinkPlanner();
+
+        plannerContext =
+                new PlannerContext(
+                        false,
+                        tableConfig,
+                        new ModuleManager(),
+                        functionCatalog,
+                        catalogManager,
+                        asRootSchema(
+                                new CatalogManagerCalciteSchema(catalogManager, isStreamingMode)),
+                        Collections.emptyList(),
+                        Thread.currentThread().getContextClassLoader());
+
+        final Parser parser =
+                new ParserImpl(
+                        catalogManager,
+                        plannerSupplier,
+                        () -> plannerSupplier.get().parser(),
+                        plannerContext.getRexFactory());
         ExpressionResolver.ExpressionResolverBuilder builder =
                 ExpressionResolver.resolverFor(
                         TableConfig.getDefault(),
@@ -97,12 +106,11 @@ public class FlinkParser {
         calciteParser = getParserBySqlDialect(SqlDialect.DEFAULT);
     }
 
-    public static CatalogManager.Builder preparedCatalogManager() {
+    public static CatalogManager.Builder preparedCatalogManager(String catalogName) {
         return CatalogManager.newBuilder()
                 .classLoader(FlinkParser.class.getClassLoader())
                 .config(new Configuration())
-                .defaultCatalog(
-                        CATALOG_NAME, new GenericInMemoryCatalog(CATALOG_NAME, DATABASE_NAME))
+                .defaultCatalog(catalogName, new GenericInMemoryCatalog(catalogName, DATABASE_NAME))
                 .executionConfig(new ExecutionConfig());
     }
 
@@ -128,7 +136,7 @@ public class FlinkParser {
     public void createDatabase(String databaseName, CatalogDatabase catalogDatabase) {
         try {
             catalogManager
-                    .getCatalog(CATALOG_NAME)
+                    .getCatalog(catalogName)
                     .get()
                     .createDatabase(databaseName, catalogDatabase, true);
         } catch (Exception e) {
@@ -143,10 +151,17 @@ public class FlinkParser {
                 createTableOperation.isIgnoreIfExists());
     }
 
+    public void creatView(CreateViewOperation createViewOperation) {
+        catalogManager.createTable(
+                createViewOperation.getCatalogView(),
+                createViewOperation.getViewIdentifier(),
+                createViewOperation.isIgnoreIfExists());
+    }
+
     public CatalogBaseTable getTable(String databaseName, String objectName)
             throws TableNotExistException, CatalogException {
         ObjectPath objectPath = new ObjectPath(databaseName, objectName);
-        return catalogManager.getCatalog(CATALOG_NAME).get().getTable(objectPath);
+        return catalogManager.getCatalog(catalogName).get().getTable(objectPath);
     }
 
     public SqlNode parseNode(String sql) {

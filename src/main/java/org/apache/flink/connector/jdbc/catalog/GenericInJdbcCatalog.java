@@ -44,7 +44,9 @@ import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.functions.FunctionIdentifier;
+import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.CreateTableOperation;
+import org.apache.flink.table.operations.ddl.CreateViewOperation;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 import org.slf4j.Logger;
@@ -634,7 +636,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     }
 
     private void load(ObjectMapper objectMapper) throws Exception {
-        flinkParser = new FlinkParser();
+        flinkParser = new FlinkParser(catalogName);
         try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
             // create databases in memory
             PreparedStatement pstmt =
@@ -653,23 +655,29 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             }
             resultSet.close();
 
-            // create table in memory
+            // create table and view in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ?");
+                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ? order by kind ");
             pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
-                CreateTableOperation createTableOperation =
-                        (CreateTableOperation) flinkParser.parse(resultSet.getString(4));
+                Operation operation = flinkParser.parse(resultSet.getString(4));
+                if (operation instanceof CreateViewOperation) {
+                    CreateViewOperation createViewOperation = (CreateViewOperation) operation;
+                    flinkParser.creatView(createViewOperation);
+                } else {
+                    CreateTableOperation createTableOperation = (CreateTableOperation) operation;
 
-                if (!StringUtils.isNullOrWhitespaceOnly(resultSet.getString(5))) {
-                    String password = EncryptUtil.decrypt(resultSet.getString(5), secretKey);
-                    DesensitiveUtil.sensitiveForProperties(
-                            password, createTableOperation.getCatalogTable().getOptions());
+                    if (!StringUtils.isNullOrWhitespaceOnly(resultSet.getString(5))) {
+                        String password = EncryptUtil.decrypt(resultSet.getString(5), secretKey);
+                        DesensitiveUtil.sensitiveForProperties(
+                                password, createTableOperation.getCatalogTable().getOptions());
+                    }
+
+                    flinkParser.creatTable(createTableOperation);
                 }
 
-                flinkParser.creatTable(createTableOperation);
                 ObjectPath objectPath =
                         new ObjectPath(resultSet.getString(1), resultSet.getString(2));
                 super.createTable(
