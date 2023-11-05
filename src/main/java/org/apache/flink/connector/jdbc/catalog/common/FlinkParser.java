@@ -7,13 +7,7 @@ import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.table.api.SqlDialect;
 import org.apache.flink.table.api.TableConfig;
-import org.apache.flink.table.catalog.Catalog;
-import org.apache.flink.table.catalog.CatalogBaseTable;
-import org.apache.flink.table.catalog.CatalogDatabase;
-import org.apache.flink.table.catalog.CatalogManager;
-import org.apache.flink.table.catalog.FunctionCatalog;
-import org.apache.flink.table.catalog.GenericInMemoryCatalog;
-import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.*;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.delegation.Parser;
@@ -145,17 +139,22 @@ public class FlinkParser {
     }
 
     public void creatTable(CreateTableOperation createTableOperation) {
-        catalogManager.createTable(
+        createTable(
                 createTableOperation.getCatalogTable(),
                 createTableOperation.getTableIdentifier(),
                 createTableOperation.isIgnoreIfExists());
     }
 
     public void creatView(CreateViewOperation createViewOperation) {
-        catalogManager.createTable(
+        createTable(
                 createViewOperation.getCatalogView(),
                 createViewOperation.getViewIdentifier(),
                 createViewOperation.isIgnoreIfExists());
+    }
+
+    public void createTable(
+            CatalogBaseTable table, ObjectIdentifier objectIdentifier, boolean ignoreIfExists) {
+        catalogManager.createTable(table, objectIdentifier, ignoreIfExists);
     }
 
     public CatalogBaseTable getTable(String databaseName, String objectName)

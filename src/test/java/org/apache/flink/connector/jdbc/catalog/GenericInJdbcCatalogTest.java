@@ -110,18 +110,6 @@ public class GenericInJdbcCatalogTest {
         }
     }
 
-    @After
-    public void clean() throws Exception {
-
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
-            Statement statement = conn.createStatement();
-            statement.execute("truncate table flink_catalog_columns");
-            statement.execute("truncate table flink_catalog_functions");
-            statement.execute("truncate table flink_catalog_tables");
-            statement.execute("truncate table flink_catalog_databases");
-        }
-    }
-
     @Test
     public void createAnddropDatabase() throws Exception {
         StreamExecutionEnvironment env = new StreamExecutionEnvironment();
@@ -154,6 +142,17 @@ public class GenericInJdbcCatalogTest {
             }
             resultSet.close();
         }
+    }
+
+    @After
+    public void clean() {
+
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql("drop database if exists my_database cascade");
+        System.out.println("clean ***********************************");
     }
 
     @Test
@@ -320,7 +319,6 @@ public class GenericInJdbcCatalogTest {
 
             System.out.println("删除视图成功");
         }
-        tEnv.executeSql("drop table test");
     }
 
     @Test

@@ -160,7 +160,13 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     public void dropDatabase(String databaseName, boolean ignoreIfNotExists, boolean cascade)
             throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(databaseName));
-        if (super.databaseExists(databaseName)) {
+        if (!ignoreIfNotExists && !super.databaseExists(databaseName)) {
+            throw new DatabaseNotExistException(getName(), databaseName);
+        } else if (!super.databaseExists(databaseName)) {
+            return;
+        }
+
+        if (!cascade) {
             if (isEmptyDatabase(databaseName)) {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
@@ -170,16 +176,43 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                     pstmt.setString(2, catalogName);
                     pstmt.execute();
                     super.dropDatabase(databaseName, ignoreIfNotExists, cascade);
-                } catch (SQLException e) {
+                } catch (Exception e) {
                     throw new ValidationException(
                             String.format("Failed drop database %s.", databaseName), e);
                 }
             } else {
                 throw new DatabaseNotEmptyException(getName(), databaseName);
             }
+        } else {
+            dropDatabaseCascade(databaseName);
+        }
+    }
 
-        } else if (!ignoreIfNotExists) {
-            throw new DatabaseNotExistException(getName(), databaseName);
+    private void dropDatabaseCascade(String databaseName) {
+        try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
+            PreparedStatement pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_databases where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+            super.dropDatabase(databaseName, true, true);
+            pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_tables where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+
+            pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_functions where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+        } catch (Exception e) {
+            throw new ValidationException(
+                    String.format("Failed drop database %s.", databaseName), e);
         }
     }
 
@@ -269,6 +302,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 conn.commit();
 
                 super.createTable(tablePath, table, ignoreIfExists);
+
             } catch (SQLException e) {
                 throw new ValidationException(
                         String.format("Failed drop database %s.", tablePath.getDatabaseName()), e);
@@ -581,7 +615,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 pstmt.setString(3, catalogName);
                 pstmt.execute();
                 super.dropFunction(path, ignoreIfNotExists);
-            } catch (SQLException e) {
+            } catch (Exception e) {
                 throw new ValidationException(
                         String.format(
                                 "Failed drop table %s.%s",
