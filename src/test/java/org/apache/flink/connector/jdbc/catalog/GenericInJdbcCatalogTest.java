@@ -5,6 +5,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.Preconditions;
+import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -141,6 +142,17 @@ public class GenericInJdbcCatalogTest {
             }
             resultSet.close();
         }
+    }
+
+    @After
+    public void clean() {
+
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql("drop database if exists my_database cascade");
+        System.out.println("clean ***********************************");
     }
 
     @Test
@@ -307,5 +319,51 @@ public class GenericInJdbcCatalogTest {
 
             System.out.println("删除视图成功");
         }
+    }
+
+    @Test
+    public void testLoadViewAndTable() throws Exception {
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+
+        tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql(CREATE_DATABASE);
+        tEnv.executeSql("use my_database");
+        tEnv.executeSql(CREATE_TEST_TABLE);
+        System.out.println("创建表成功：");
+
+        String createView =
+                "CREATE VIEW my_database.test_view(`c1`, `id`) as  SELECT `test`.`c1`, `test`.`id`  FROM `my_catalog`.`my_database`.`test`  WHERE `test`.`c1` = '2'";
+        tEnv.executeSql("create view test_view as select c1, id from test where c1 = '2'");
+        System.out.println("创建视图成功：");
+        try (Connection connection =
+                DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
+            Statement statement = connection.createStatement();
+            ResultSet resultSet =
+                    statement.executeQuery(
+                            "select script,password from flink_catalog_tables  where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+
+                String script =
+                        resultSet.getString(1).replaceAll("\\r", " ").replaceAll("\\n", " ");
+                Preconditions.checkArgument(createView.equals(script));
+            }
+            resultSet.close();
+
+            resultSet =
+                    statement.executeQuery(
+                            "select count(1) from flink_catalog_columns where catalog_name = 'my_catalog' and  database_name='my_database' and object_name = 'test_view'");
+
+            while (resultSet.next()) {
+                Preconditions.checkArgument(resultSet.getInt(1) == 2);
+            }
+            resultSet.close();
+        }
+
+        env = StreamExecutionEnvironment.createLocalEnvironment();
+        tEnv = StreamTableEnvironment.create(env);
+        tEnv.executeSql(CREATE_CATALOG);
     }
 }

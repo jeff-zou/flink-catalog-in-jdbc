@@ -6,7 +6,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.2-flink-1.15</version>
+    <version>1.8.4-flink-1.15</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>

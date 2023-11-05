@@ -44,7 +44,9 @@ import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.functions.FunctionIdentifier;
+import org.apache.flink.table.operations.Operation;
 import org.apache.flink.table.operations.ddl.CreateTableOperation;
+import org.apache.flink.table.operations.ddl.CreateViewOperation;
 import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.StringUtils;
 import org.slf4j.Logger;
@@ -158,7 +160,13 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     public void dropDatabase(String databaseName, boolean ignoreIfNotExists, boolean cascade)
             throws DatabaseNotExistException, DatabaseNotEmptyException, CatalogException {
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(databaseName));
-        if (super.databaseExists(databaseName)) {
+        if (!ignoreIfNotExists && !super.databaseExists(databaseName)) {
+            throw new DatabaseNotExistException(getName(), databaseName);
+        } else if (!super.databaseExists(databaseName)) {
+            return;
+        }
+
+        if (!cascade) {
             if (isEmptyDatabase(databaseName)) {
                 try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
                     PreparedStatement pstmt =
@@ -168,16 +176,43 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                     pstmt.setString(2, catalogName);
                     pstmt.execute();
                     super.dropDatabase(databaseName, ignoreIfNotExists, cascade);
-                } catch (SQLException e) {
+                } catch (Exception e) {
                     throw new ValidationException(
                             String.format("Failed drop database %s.", databaseName), e);
                 }
             } else {
                 throw new DatabaseNotEmptyException(getName(), databaseName);
             }
+        } else {
+            dropDatabaseCascade(databaseName);
+        }
+    }
 
-        } else if (!ignoreIfNotExists) {
-            throw new DatabaseNotExistException(getName(), databaseName);
+    private void dropDatabaseCascade(String databaseName) {
+        try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
+            PreparedStatement pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_databases where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+            super.dropDatabase(databaseName, true, true);
+            pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_tables where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+
+            pstmt =
+                    conn.prepareStatement(
+                            "delete from  flink_catalog_functions where database_name = ? and catalog_name=?");
+            pstmt.setString(1, databaseName);
+            pstmt.setString(2, catalogName);
+            pstmt.execute();
+        } catch (Exception e) {
+            throw new ValidationException(
+                    String.format("Failed drop database %s.", databaseName), e);
         }
     }
 
@@ -267,6 +302,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 conn.commit();
 
                 super.createTable(tablePath, table, ignoreIfExists);
+
             } catch (SQLException e) {
                 throw new ValidationException(
                         String.format("Failed drop database %s.", tablePath.getDatabaseName()), e);
@@ -579,7 +615,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
                 pstmt.setString(3, catalogName);
                 pstmt.execute();
                 super.dropFunction(path, ignoreIfNotExists);
-            } catch (SQLException e) {
+            } catch (Exception e) {
                 throw new ValidationException(
                         String.format(
                                 "Failed drop table %s.%s",
@@ -634,7 +670,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     }
 
     private void load(ObjectMapper objectMapper) throws Exception {
-        flinkParser = new FlinkParser();
+        flinkParser = new FlinkParser(catalogName);
         try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
             // create databases in memory
             PreparedStatement pstmt =
@@ -653,23 +689,29 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             }
             resultSet.close();
 
-            // create table in memory
+            // create table and view in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ?");
+                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ? order by kind ");
             pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
-                CreateTableOperation createTableOperation =
-                        (CreateTableOperation) flinkParser.parse(resultSet.getString(4));
+                Operation operation = flinkParser.parse(resultSet.getString(4));
+                if (operation instanceof CreateViewOperation) {
+                    CreateViewOperation createViewOperation = (CreateViewOperation) operation;
+                    flinkParser.creatView(createViewOperation);
+                } else {
+                    CreateTableOperation createTableOperation = (CreateTableOperation) operation;
 
-                if (!StringUtils.isNullOrWhitespaceOnly(resultSet.getString(5))) {
-                    String password = EncryptUtil.decrypt(resultSet.getString(5), secretKey);
-                    DesensitiveUtil.sensitiveForProperties(
-                            password, createTableOperation.getCatalogTable().getOptions());
+                    if (!StringUtils.isNullOrWhitespaceOnly(resultSet.getString(5))) {
+                        String password = EncryptUtil.decrypt(resultSet.getString(5), secretKey);
+                        DesensitiveUtil.sensitiveForProperties(
+                                password, createTableOperation.getCatalogTable().getOptions());
+                    }
+
+                    flinkParser.creatTable(createTableOperation);
                 }
 
-                flinkParser.creatTable(createTableOperation);
                 ObjectPath objectPath =
                         new ObjectPath(resultSet.getString(1), resultSet.getString(2));
                 super.createTable(
