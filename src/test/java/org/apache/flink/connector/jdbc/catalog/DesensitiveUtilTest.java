@@ -37,6 +37,24 @@ class DesensitiveUtilTest {
     }
 
     @Test
+    void desensitiveForProperties3() {
+        Map<String, String> properties = new HashMap<String, String>();
+        properties.put("connector", "jdbc");
+        properties.put("password", "*******");
+        DesensitiveUtil.desensitiveForProperties(properties);
+        Preconditions.checkArgument(
+                properties.get("password").equals(DesensitiveUtil.DESENSITIVE_STRIGN));
+    }
+
+    @Test
+    void desensitiveForProperties4() {
+        Map<String, String> properties = new HashMap<String, String>();
+        properties.put("connector", "jdbc");
+        String password = DesensitiveUtil.desensitiveForProperties(properties);
+        Preconditions.checkArgument(password == null);
+    }
+
+    @Test
     void sensitiveForProperties() {
         String password = "aaa";
         Map<String, String> properties = new HashMap<String, String>();

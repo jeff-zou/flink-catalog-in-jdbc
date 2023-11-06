@@ -34,7 +34,7 @@ public class DesensitiveUtil {
                 properties.put(SENSITIVE_KEY_PASSWORD, DESENSITIVE_STRIGN);
             }
         }
-        return password;
+        return DESENSITIVE_STRIGN.equals(password) ? null : password;
     }
 
     public static boolean sensitiveForProperties(String password, Map<String, String> properties) {
