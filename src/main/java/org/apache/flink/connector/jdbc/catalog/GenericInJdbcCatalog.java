@@ -18,9 +18,6 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
 import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
 import org.apache.flink.connector.jdbc.catalog.common.FlinkParser;
@@ -57,13 +54,19 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A generic catalog implementation that holds all meta objects in jdbc. */
 public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenericInJdbcCatalog.class);
+
+    public static final String CATALOG_LOAD_TARGET_DATABASE_SEPERATOR = ",";
 
     private final String username;
     private final String pwd;
@@ -76,13 +79,16 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
 
     private final String secretKey;
 
+    private final String targetDatabases;
+
     public GenericInJdbcCatalog(
             String catalogName,
             String defaultDatabase,
             String username,
             String pwd,
             String url,
-            String secretKey) {
+            String secretKey,
+            String targetDatabases) {
         super(catalogName, defaultDatabase);
 
         checkArgument(!StringUtils.isNullOrWhitespaceOnly(username));
@@ -95,12 +101,13 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         this.pwd = pwd;
         this.url = url;
         this.secretKey = secretKey;
+        this.targetDatabases = targetDatabases;
         objectMapper = new ObjectMapper();
     }
 
     private void validateJdbcUrl(String url) {
         String[] parts = url.trim().split("\\/+");
-        //        Preconditions.checkArgument(parts.length == 3);
+        // Preconditions.checkArgument(parts.length == 3);
     }
 
     @Override
@@ -110,7 +117,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         }
 
         try {
-            load(objectMapper);
+            load(targetDatabases, objectMapper);
         } catch (Exception e1) {
             throw new ValidationException(
                     String.format("Failed load catalog data from jdbc %s .", this.url), e1);
@@ -494,10 +501,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             CatalogPartition partition,
             boolean ignoreIfExists)
             throws TableNotExistException,
-                    TableNotPartitionedException,
-                    PartitionSpecInvalidException,
-                    PartitionAlreadyExistsException,
-                    CatalogException {
+            TableNotPartitionedException,
+            PartitionSpecInvalidException,
+            PartitionAlreadyExistsException,
+            CatalogException {
         throw new UnsupportedOperationException();
     }
 
@@ -669,19 +676,32 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
         throw new UnsupportedOperationException();
     }
 
-    private void load(ObjectMapper objectMapper) throws Exception {
+    private void load(String targetDatabases, ObjectMapper objectMapper) throws Exception {
+
+        String databaseCondition = " ";
+        if (!StringUtils.isNullOrWhitespaceOnly(targetDatabases)) {
+            StringBuilder stringBuilder = new StringBuilder(" and database_name in (");
+            String[] dbs = targetDatabases.split(CATALOG_LOAD_TARGET_DATABASE_SEPERATOR);
+            Arrays.stream(dbs)
+                    .iterator()
+                    .forEachRemaining(db -> stringBuilder.append("'").append(db).append("'"));
+            stringBuilder.append(")");
+
+            databaseCondition = stringBuilder.toString();
+        }
+
         flinkParser = new FlinkParser(catalogName);
         try (Connection conn = DriverManager.getConnection(url, username, pwd)) {
             // create databases in memory
             PreparedStatement pstmt =
                     conn.prepareStatement(
-                            "select database_name, comment, properties from  flink_catalog_databases where catalog_name = ? ");
+                            "select database_name, comment, properties from  flink_catalog_databases where catalog_name = ? "
+                                    + databaseCondition);
             pstmt.setString(1, catalogName);
             ResultSet resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 Map<String, String> properties =
-                        (Map<String, String>)
-                                objectMapper.readValue(resultSet.getString(3), Map.class);
+                        (Map<String, String>) objectMapper.readValue(resultSet.getString(3), Map.class);
                 CatalogDatabase catalogDatabase =
                         new CatalogDatabaseImpl(properties, resultSet.getString(2));
                 flinkParser.createDatabase(resultSet.getString(1), catalogDatabase);
@@ -692,7 +712,9 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             // create table and view in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ? order by kind ");
+                            "select database_name, object_name, kind, script, password  from  flink_catalog_tables where catalog_name = ? "
+                                    + databaseCondition
+                                    + " order by kind ");
             pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
@@ -725,7 +747,8 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             // craete function in memory
             pstmt =
                     conn.prepareStatement(
-                            "select database_name, object_name,  class_name, function_language from flink_catalog_functions where catalog_name = ?");
+                            "select database_name, object_name,  class_name, function_language from flink_catalog_functions where catalog_name = ?"
+                                    + databaseCondition);
             pstmt.setString(1, catalogName);
             resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
