@@ -5,7 +5,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.6</version>
+    <version>1.8.7</version>
     <name>flink-catalog-in-jdbc</name>
 
     <description>the catalog for flink which store in jdbc.</description>
