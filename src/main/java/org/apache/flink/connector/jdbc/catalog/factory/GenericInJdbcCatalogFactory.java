@@ -18,9 +18,6 @@
 
 package org.apache.flink.connector.jdbc.catalog.factory;
 
-import static org.apache.flink.connector.jdbc.catalog.factory.GenericInJdbcCatalogFactoryOptions.*;
-import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
-
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.connector.jdbc.catalog.GenericInJdbcCatalog;
 import org.apache.flink.table.catalog.Catalog;
@@ -31,6 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.apache.flink.connector.jdbc.catalog.factory.GenericInJdbcCatalogFactoryOptions.*;
+import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
 
 /** Factory for {@link GenericInJdbcCatalog}. */
 public class GenericInJdbcCatalogFactory implements CatalogFactory {
@@ -57,6 +57,7 @@ public class GenericInJdbcCatalogFactory implements CatalogFactory {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PROPERTY_VERSION);
         options.add(SECRET_KEY);
+        options.add(TARGET_DATABASES);
         return options;
     }
 
@@ -72,6 +73,7 @@ public class GenericInJdbcCatalogFactory implements CatalogFactory {
                 helper.getOptions().get(USERNAME),
                 helper.getOptions().get(PASSWORD),
                 helper.getOptions().get(URL),
-                helper.getOptions().get(SECRET_KEY));
+                helper.getOptions().get(SECRET_KEY),
+                helper.getOptions().get(TARGET_DATABASES));
     }
 }

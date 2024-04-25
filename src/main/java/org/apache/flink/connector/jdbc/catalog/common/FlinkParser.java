@@ -1,6 +1,22 @@
-package org.apache.flink.connector.jdbc.catalog.common;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-import static org.apache.calcite.jdbc.CalciteSchemaBuilder.asRootSchema;
+package org.apache.flink.connector.jdbc.catalog.common;
 
 import org.apache.calcite.sql.SqlNode;
 import org.apache.flink.api.common.ExecutionConfig;
@@ -27,10 +43,13 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import static org.apache.calcite.jdbc.CalciteSchemaBuilder.asRootSchema;
+
 /**
  * @Author: Jeff Zou @Date: 2022/8/8 17:13
  */
 public class FlinkParser {
+
     private final String catalogName;
     private static final String DATABASE_NAME = "default";
     private final boolean isStreamingMode = true;
@@ -59,11 +78,10 @@ public class FlinkParser {
         final FunctionCatalog functionCatalog =
                 new FunctionCatalog(tableConfig, catalogManager, moduleManager);
         final Supplier<FlinkPlannerImpl> plannerSupplier =
-                () ->
-                        getPlannerContext()
-                                .createFlinkPlanner(
-                                        catalogManager.getCurrentCatalog(),
-                                        catalogManager.getCurrentDatabase());
+                () -> getPlannerContext()
+                        .createFlinkPlanner(
+                                catalogManager.getCurrentCatalog(),
+                                catalogManager.getCurrentDatabase());
 
         plannerContext =
                 new PlannerContext(
