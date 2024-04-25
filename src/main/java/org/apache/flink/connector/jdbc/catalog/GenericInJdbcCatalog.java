@@ -18,9 +18,6 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-
 import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
 import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
 import org.apache.flink.connector.jdbc.catalog.common.FlinkParser;
@@ -59,6 +56,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A generic catalog implementation that holds all meta objects in jdbc. */
 public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
@@ -500,10 +500,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             CatalogPartition partition,
             boolean ignoreIfExists)
             throws TableNotExistException,
-                    TableNotPartitionedException,
-                    PartitionSpecInvalidException,
-                    PartitionAlreadyExistsException,
-                    CatalogException {
+            TableNotPartitionedException,
+            PartitionSpecInvalidException,
+            PartitionAlreadyExistsException,
+            CatalogException {
         throw new UnsupportedOperationException();
     }
 
@@ -702,8 +702,7 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             ResultSet resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 Map<String, String> properties =
-                        (Map<String, String>)
-                                objectMapper.readValue(resultSet.getString(3), Map.class);
+                        (Map<String, String>) objectMapper.readValue(resultSet.getString(3), Map.class);
                 CatalogDatabase catalogDatabase =
                         new CatalogDatabaseImpl(properties, resultSet.getString(2));
                 flinkParser.createDatabase(resultSet.getString(1), catalogDatabase);
