@@ -18,6 +18,9 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+
 import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
 import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
 import org.apache.flink.connector.jdbc.catalog.common.FlinkParser;
@@ -54,12 +57,8 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** A generic catalog implementation that holds all meta objects in jdbc. */
 public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
@@ -501,10 +500,10 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             CatalogPartition partition,
             boolean ignoreIfExists)
             throws TableNotExistException,
-            TableNotPartitionedException,
-            PartitionSpecInvalidException,
-            PartitionAlreadyExistsException,
-            CatalogException {
+                    TableNotPartitionedException,
+                    PartitionSpecInvalidException,
+                    PartitionAlreadyExistsException,
+                    CatalogException {
         throw new UnsupportedOperationException();
     }
 
@@ -677,14 +676,16 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
     }
 
     private void load(String targetDatabases, ObjectMapper objectMapper) throws Exception {
-
         String databaseCondition = " ";
         if (!StringUtils.isNullOrWhitespaceOnly(targetDatabases)) {
             StringBuilder stringBuilder = new StringBuilder(" and database_name in (");
             String[] dbs = targetDatabases.split(CATALOG_LOAD_TARGET_DATABASE_SEPERATOR);
-            Arrays.stream(dbs)
-                    .iterator()
-                    .forEachRemaining(db -> stringBuilder.append("'").append(db).append("'"));
+            for (int i = 0; i < dbs.length; i++) {
+                stringBuilder.append("'").append(dbs[i].trim()).append("'");
+                if (i != dbs.length - 1) {
+                    stringBuilder.append(CATALOG_LOAD_TARGET_DATABASE_SEPERATOR);
+                }
+            }
             stringBuilder.append(")");
 
             databaseCondition = stringBuilder.toString();
@@ -701,7 +702,8 @@ public class GenericInJdbcCatalog extends GenericInMemoryCatalog {
             ResultSet resultSet = pstmt.executeQuery();
             while (resultSet.next()) {
                 Map<String, String> properties =
-                        (Map<String, String>) objectMapper.readValue(resultSet.getString(3), Map.class);
+                        (Map<String, String>)
+                                objectMapper.readValue(resultSet.getString(3), Map.class);
                 CatalogDatabase catalogDatabase =
                         new CatalogDatabaseImpl(properties, resultSet.getString(2));
                 flinkParser.createDatabase(resultSet.getString(1), catalogDatabase);

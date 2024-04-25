@@ -5,7 +5,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.7</version>
+    <version>1.8.8</version>
     <name>flink-catalog-in-jdbc</name>
 
     <description>the catalog for flink which store in jdbc.</description>
@@ -216,6 +216,14 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.0.0-M5</version>
                 <!-- 使用JUnit 5兼容的Surefire插件版本 -->
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>10</source>
+                    <target>10</target>
+                </configuration>
             </plugin>
         </plugins>
     </build>
