@@ -23,9 +23,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.util.Preconditions;
-import org.junit.After;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.*;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -47,7 +45,7 @@ public class GenericInJdbcCatalogTest {
                     + DB_USERNAME
                     + "', 'password'='"
                     + DB_PASSWORD
-                    + "','secret.key'='test','target.databases'='my_database',"
+                    + "','secret.key'='test',"
                     + " 'url'='"
                     + DB_URL
                     + "')";
@@ -79,9 +77,8 @@ public class GenericInJdbcCatalogTest {
     private static final String ENCRYPTED_TEST_TABLE =
             "CREATE TABLE my_database.test (    `c1` VARCHAR(2147483647),   `id` INT NOT NULL,   `stime` TIMESTAMP(3),   `cost` AS `id` * 10,   WATERMARK FOR `stime` AS `stime` - INTERVAL '10' SECOND ) COMMENT 'test'  PARTITIONED BY (`c1`) WITH (   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username=\"test\"  password=\"******\";',   'properties.bootstrap.servers' = '127.0.0.1:9093',   'connector' = 'kafka',   'format' = 'json',   'topic' = 'test',   'properties.group.id' = 'test',   'properties.acks' = '0',   'properties.value.serializer' = 'org.apache.kafka.common.serialization.ByteArraySerializer',   'properties.enable.auto.commit' = 'true' ) ";
 
-    @BeforeClass
+    @BeforeAll
     public static void initDatabase() throws Exception {
-
         try (Connection conn = DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD)) {
             Statement statement = conn.createStatement();
             statement.executeUpdate(
@@ -101,6 +98,7 @@ public class GenericInJdbcCatalogTest {
                             + "  `comment` varchar(200) DEFAULT NULL,\n"
                             + "  `password` varchar(200) DEFAULT NULL,\n"
                             + "  `catalog_name` varchar(100) NOT NULL,\n"
+                            + "  `schema_properties` varchar(5000) NOT NULL,\n"
                             + "  PRIMARY KEY (`catalog_name`,`database_name`,`object_name`)\n"
                             + ") ");
             statement.executeUpdate(
@@ -126,6 +124,16 @@ public class GenericInJdbcCatalogTest {
                             + ") ");
             statement.close();
         }
+    }
+
+    @AfterEach
+    public void clean() {
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql("drop database if exists my_database cascade");
+        System.out.println("clean ***********************************");
     }
 
     @Test
@@ -160,17 +168,6 @@ public class GenericInJdbcCatalogTest {
             }
             resultSet.close();
         }
-    }
-
-    @After
-    public void clean() {
-
-        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
-        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-        tEnv.executeSql(CREATE_CATALOG);
-        tEnv.executeSql("use catalog my_catalog");
-        tEnv.executeSql("drop database if exists my_database cascade");
-        System.out.println("clean ***********************************");
     }
 
     @Test
@@ -379,10 +376,24 @@ public class GenericInJdbcCatalogTest {
             }
             resultSet.close();
         }
-        env.close();
+    }
 
-        env = StreamExecutionEnvironment.createLocalEnvironment();
-        tEnv = StreamTableEnvironment.create(env);
+    @Test
+    public void testShow() throws Exception {
+        StreamExecutionEnvironment env = new StreamExecutionEnvironment();
+        StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
         tEnv.executeSql(CREATE_CATALOG);
+        tEnv.executeSql("use catalog my_catalog");
+        tEnv.executeSql(CREATE_DATABASE);
+        tEnv.executeSql("use my_database");
+        tEnv.executeSql(CREATE_TEST_TABLE);
+        tEnv.executeSql("show create table test").print();
+        tEnv.executeSql("create view test_view as select c1, id from test where c1 = '2'");
+        tEnv.executeSql("show create view test_view").print();
+        tEnv.executeSql("show tables").print();
+        tEnv.executeSql("drop view test_view").print();
+        tEnv.executeSql("drop table test").print();
+        System.out.println("-----------------");
+        tEnv.executeSql("show tables").print();
     }
 }

@@ -48,13 +48,5 @@ public class GenericInJdbcCatalogFactoryOptions {
     public static final ConfigOption<String> SECRET_KEY =
             ConfigOptions.key("secret.key").stringType().noDefaultValue();
 
-    public static final ConfigOption<String> TARGET_DATABASES =
-            ConfigOptions.key("target.databases")
-                    .stringType()
-                    .noDefaultValue()
-                    .withDescription(
-                            "just load specified database,multi db seperated by comma, eg: db1,db2,db3");
-
-    private GenericInJdbcCatalogFactoryOptions() {
-    }
+    private GenericInJdbcCatalogFactoryOptions() {}
 }

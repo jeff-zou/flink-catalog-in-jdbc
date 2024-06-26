@@ -1,7 +1,7 @@
 ### Instructions for use：
 
 After executing mvn package on the command line, import the generated package
-flink-catalog-in-jdbc-1.8.8.jar into flink(support flink 1.16) lib, no other settings are required.
+flink-catalog-in-jdbc-2.0.0.jar into flink(support flink 1.16) lib, no other settings are required.
 
 Development environment engineering direct reference:
 
@@ -9,16 +9,7 @@ Development environment engineering direct reference:
 <dependency>
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.8</version>
-</dependency>
-```
-
-if your flink's version is 1.15:
-```
-<dependency>
-    <groupId>io.github.jeff-zou</groupId>
-    <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.8-flink-1.15</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
@@ -42,6 +33,7 @@ CREATE TABLE `flink_catalog_tables` (
     `comment` varchar(200) DEFAULT NULL,
     `password` varchar(200) DEFAULT NULL,
     `catalog_name` varchar(100) NOT NULL,
+    `schema_properties` varchar(5000) NOT NULL,
     PRIMARY KEY (`catalog_name`,`database_name`,`object_name`)
 ) ;
 

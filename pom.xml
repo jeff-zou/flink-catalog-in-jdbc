@@ -5,7 +5,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>1.8.8</version>
+    <version>2.0.0</version>
     <name>flink-catalog-in-jdbc</name>
 
     <description>the catalog for flink which store in jdbc.</description>
@@ -319,10 +319,6 @@
                                     <goal>sign</goal>
                                 </goals>
                                 <phase>verify</phase>
-                                <configuration>
-                                    <keyname>D8569E743AC67440</keyname>
-                                    <passphraseServerId>D8569E743AC67440</passphraseServerId>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
