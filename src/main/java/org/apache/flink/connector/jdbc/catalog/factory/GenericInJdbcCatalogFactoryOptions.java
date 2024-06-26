@@ -48,5 +48,6 @@ public class GenericInJdbcCatalogFactoryOptions {
     public static final ConfigOption<String> SECRET_KEY =
             ConfigOptions.key("secret.key").stringType().noDefaultValue();
 
-    private GenericInJdbcCatalogFactoryOptions() {}
+    private GenericInJdbcCatalogFactoryOptions() {
+    }
 }

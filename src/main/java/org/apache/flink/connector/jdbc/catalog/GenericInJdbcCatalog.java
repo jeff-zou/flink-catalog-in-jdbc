@@ -18,10 +18,6 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.StringUtils.isNullOrWhitespaceOnly;
-
 import org.apache.flink.connector.jdbc.catalog.common.CatalogViewSerialize;
 import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
 import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
@@ -57,6 +53,10 @@ import org.slf4j.LoggerFactory;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
+
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.StringUtils.isNullOrWhitespaceOnly;
 
 /** A generic catalog implementation that holds all meta objects in jdbc with no cache. */
 public class GenericInJdbcCatalog extends AbstractCatalog {
@@ -520,10 +520,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             CatalogPartition partition,
             boolean ignoreIfExists)
             throws TableNotExistException,
-                    TableNotPartitionedException,
-                    PartitionSpecInvalidException,
-                    PartitionAlreadyExistsException,
-                    CatalogException {
+            TableNotPartitionedException,
+            PartitionSpecInvalidException,
+            PartitionAlreadyExistsException,
+            CatalogException {
         throw new UnsupportedOperationException();
     }
 
@@ -903,9 +903,9 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     public List<CatalogPartitionSpec> listPartitions(
             ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
             throws TableNotExistException,
-                    TableNotPartitionedException,
-                    PartitionSpecInvalidException,
-                    CatalogException {
+            TableNotPartitionedException,
+            PartitionSpecInvalidException,
+            CatalogException {
         return null;
     }
 
