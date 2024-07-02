@@ -1,7 +1,7 @@
 ### Instructions for use：
 
 After executing mvn package on the command line, import the generated package
-flink-catalog-in-jdbc-2.0.0.jar into flink(support flink 1.16) lib, no other settings are required.
+flink-catalog-in-jdbc-2.0.1.jar into flink(support flink 1.16) lib, no other settings are required.
 
 Development environment engineering direct reference:
 
@@ -9,7 +9,7 @@ Development environment engineering direct reference:
 <dependency>
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
 </dependency>
 ```
 
@@ -87,8 +87,18 @@ CREATE TABLE if not exists `test` (
 ```
 Parameter Description</br>
 
-| Parameter  | Description                                                                                                                                                   |
-|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| username   | the username of DB                                                                                                                                            |
-| password   | the password of DB                                                                                                                                            |
-| secret.key | The key used for encrypting the password which in the metadata, it should not be modified after the data is saved, otherwise the metadata cannot be restored. |
+
+| Field                    | Default                       | Type   | Description                                                                                                                                                   |
+|--------------------------|-------------------------------|--------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| username                 |                               | String | the username of DB                                                                                                                                            |
+| password                 |                               | String | the password of DB                                                                                                                                            |
+| secret.key               |                               | String | The key used for encrypting the password which in the metadata, it should not be modified after the data is saved, otherwise the metadata cannot be restored. |
+| url                      |                               | String | the url of DB                                                                                                                                                 |
+| jdbc.driver.class        | com.mysql.cj.jdbc.Driver      | String | the driver class name of jdbc                                                                                                                                 |
+| connection.test.query    | SELECT 1                      | String | the test query for connection                                                                                                                                 |
+| pool.max.size            | 2                             | int    | max  size of pool                                                                                                                                             |
+| pool.min.idle            | 1                             | int    | min idle of connection                                                                                                                                        |
+| max.life.time            | 1800000                       | int    | set maximum lifetime for the connection (milliseconds)                                                                                                        |
+| connect.time.out         | 30000                         | int    | set connection timeout (milliseconds)                                                                                                                         |
+
+

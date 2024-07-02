@@ -48,6 +48,31 @@ public class GenericInJdbcCatalogFactoryOptions {
     public static final ConfigOption<String> SECRET_KEY =
             ConfigOptions.key("secret.key").stringType().noDefaultValue();
 
-    private GenericInJdbcCatalogFactoryOptions() {
-    }
+    public static final ConfigOption<String> JDBC_DRIVER_CLASS =
+            ConfigOptions.key("jdbc.driver.class")
+                    .stringType()
+                    .defaultValue("com.mysql.cj.jdbc.Driver");
+
+    public static final ConfigOption<String> CONNECTON_TEST_QUERY =
+            ConfigOptions.key("connection.test.query").stringType().defaultValue("SELECT 1");
+
+    public static final ConfigOption<Integer> POOL_MAX_SIZE =
+            ConfigOptions.key("pool.max.size").intType().defaultValue(2);
+
+    public static final ConfigOption<Integer> POOL_MIN_IDLE =
+            ConfigOptions.key("pool.min.idle").intType().defaultValue(1);
+
+    public static final ConfigOption<Integer> MAX_LIFE_TIME =
+            ConfigOptions.key("max.life.time")
+                    .intType()
+                    .defaultValue(1800000)
+                    .withDescription("set maximum lifetime for the connection (milliseconds)");
+
+    public static final ConfigOption<Integer> CONNECTOR_TIMEOUT =
+            ConfigOptions.key("connect.time.out")
+                    .intType()
+                    .defaultValue(30000)
+                    .withDescription("set connection timeout (milliseconds)");
+
+    private GenericInJdbcCatalogFactoryOptions() {}
 }

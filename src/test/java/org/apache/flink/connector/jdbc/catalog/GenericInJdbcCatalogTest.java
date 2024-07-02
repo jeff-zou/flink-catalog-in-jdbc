@@ -45,7 +45,7 @@ public class GenericInJdbcCatalogTest {
                     + DB_USERNAME
                     + "', 'password'='"
                     + DB_PASSWORD
-                    + "','secret.key'='test',"
+                    + "','secret.key'='test', 'jdbc.driver.class'='org.h2.Driver',"
                     + " 'url'='"
                     + DB_URL
                     + "')";

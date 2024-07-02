@@ -18,6 +18,13 @@
 
 package org.apache.flink.connector.jdbc.catalog;
 
+import static org.apache.flink.util.Preconditions.checkArgument;
+import static org.apache.flink.util.Preconditions.checkNotNull;
+import static org.apache.flink.util.StringUtils.isNullOrWhitespaceOnly;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import org.apache.flink.connector.jdbc.catalog.common.CatalogViewSerialize;
 import org.apache.flink.connector.jdbc.catalog.common.DesensitiveUtil;
 import org.apache.flink.connector.jdbc.catalog.common.EncryptUtil;
@@ -54,60 +61,39 @@ import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
 import java.util.*;
 
-import static org.apache.flink.util.Preconditions.checkArgument;
-import static org.apache.flink.util.Preconditions.checkNotNull;
-import static org.apache.flink.util.StringUtils.isNullOrWhitespaceOnly;
-
 /** A generic catalog implementation that holds all meta objects in jdbc with no cache. */
 public class GenericInJdbcCatalog extends AbstractCatalog {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenericInJdbcCatalog.class);
 
-    private final String username;
-    private final String pwd;
-    private final String url;
     private ObjectMapper objectMapper;
     private static final String DEFAULT_DATABASE = "default";
 
     private final String secretKey;
 
-    private Connection conn;
-
     private CatalogViewSerialize catalogViewSerialize;
+
+    private final HikariConfig hikariConfig;
+
+    private HikariDataSource dataSource;
 
     public GenericInJdbcCatalog(
             String catalogName,
             String defaultDatabase,
-            String username,
-            String pwd,
-            String url,
-            String secretKey) {
+            String secretKey,
+            HikariConfig hikariConfig) {
         super(catalogName, defaultDatabase);
-        checkArgument(!StringUtils.isNullOrWhitespaceOnly(username));
-        checkArgument(!StringUtils.isNullOrWhitespaceOnly(pwd));
-        checkArgument(!StringUtils.isNullOrWhitespaceOnly(url));
-
-        validateJdbcUrl(url);
-        this.username = username;
-        this.pwd = pwd;
-        this.url = url;
+        checkArgument(!StringUtils.isNullOrWhitespaceOnly(hikariConfig.getUsername()));
+        checkArgument(!StringUtils.isNullOrWhitespaceOnly(hikariConfig.getPassword()));
+        checkArgument(!StringUtils.isNullOrWhitespaceOnly(hikariConfig.getJdbcUrl()));
+        this.hikariConfig = hikariConfig;
         this.secretKey = secretKey;
-    }
-
-    private void validateJdbcUrl(String url) {
-        String[] parts = url.trim().split("\\/+");
-        // Preconditions.checkArgument(parts.length == 3);
     }
 
     @Override
     public void open() throws CatalogException {
-        if (conn == null) {
-            try {
-                conn = DriverManager.getConnection(url, username, pwd);
-            } catch (Exception e1) {
-                throw new CatalogException(
-                        String.format("Failed connect to jdbc %s .", this.url), e1);
-            }
+        if (dataSource == null) {
+            dataSource = new HikariDataSource(hikariConfig);
         }
 
         if (!DEFAULT_DATABASE.equals(getDefaultDatabase())
@@ -127,13 +113,9 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
     @Override
     public void close() throws CatalogException {
-        if (conn != null) {
-            try {
-                conn.close();
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-            conn = null;
+        if (dataSource != null) {
+            dataSource.close();
+            dataSource = null;
             LOG.info("Close connection to jdbc metastore");
         }
     }
@@ -155,10 +137,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             return;
         }
 
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "insert into flink_catalog_databases (database_name, comment, properties,catalog_name ) values (?, ?, ?, ?)");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "insert into flink_catalog_databases (database_name, comment, properties,catalog_name ) values (?, ?, ?, ?)")) {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, database.getComment());
             pstmt.setString(3, objectMapper.writeValueAsString(database.getProperties()));
@@ -183,10 +165,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
         if (!cascade) {
             if (isEmptyDatabase(databaseName)) {
-                try {
-                    PreparedStatement pstmt =
-                            conn.prepareStatement(
-                                    "delete from  flink_catalog_databases where database_name = ? and catalog_name=?");
+                try (Connection conn = dataSource.getConnection();
+                        PreparedStatement pstmt =
+                                conn.prepareStatement(
+                                        "delete from  flink_catalog_databases where database_name = ? and catalog_name=?")) {
                     pstmt.setString(1, databaseName);
                     pstmt.setString(2, getName());
                     pstmt.execute();
@@ -203,7 +185,9 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     }
 
     private void dropDatabaseCascade(String databaseName) {
-        try {
+
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
             PreparedStatement pstmt =
                     conn.prepareStatement(
                             "delete from  flink_catalog_databases where database_name = ? and catalog_name=?");
@@ -230,6 +214,7 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, getName());
             pstmt.execute();
+            conn.commit();
         } catch (Exception e) {
             throw new ValidationException(
                     String.format("Failed drop database %s.", databaseName), e);
@@ -250,10 +235,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
         CatalogDatabase existingDatabase = getDatabase(databaseName);
 
         if (existingDatabase != null) {
-            try {
-                PreparedStatement pstmt =
-                        conn.prepareStatement(
-                                "update flink_catalog_databases set comment = ? , properties =?  where database_name = ? and catalog_name = ?");
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement pstmt =
+                            conn.prepareStatement(
+                                    "update flink_catalog_databases set comment = ? , properties =?  where database_name = ? and catalog_name = ?")) {
                 pstmt.setString(1, newDatabase.getComment());
                 pstmt.setString(2, objectMapper.writeValueAsString(newDatabase.getProperties()));
                 pstmt.setString(3, databaseName);
@@ -286,7 +271,7 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
                 throw new TableAlreadyExistException(getName(), tablePath);
             }
         } else {
-            try {
+            try (Connection conn = dataSource.getConnection()) {
                 conn.setAutoCommit(false);
                 String password = DesensitiveUtil.desensitiveForProperties(table.getOptions());
                 Map<String, String> schemaAndProperties = null;
@@ -370,7 +355,7 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             throws TableNotExistException, CatalogException {
         checkNotNull(tablePath);
         if (tableExists(tablePath)) {
-            try {
+            try (Connection conn = dataSource.getConnection()) {
                 conn.setAutoCommit(false);
                 PreparedStatement pstmt =
                         conn.prepareStatement(
@@ -411,7 +396,7 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             if (tableExists(newPath)) {
                 throw new TableAlreadyExistException(getName(), newPath);
             } else {
-                try {
+                try (Connection conn = dataSource.getConnection()) {
                     conn.setAutoCommit(false);
                     PreparedStatement pstmt =
                             conn.prepareStatement(
@@ -477,10 +462,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
                                 existingTable.getTableKind(), newTable.getTableKind()));
             }
 
-            try {
-                PreparedStatement pstmt =
-                        conn.prepareStatement(
-                                "update flink_catalog_tables set script = ? where database_name = ? and object_name= ? and catalog_name = ?");
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement pstmt =
+                            conn.prepareStatement(
+                                    "update flink_catalog_tables set script = ? where database_name = ? and object_name= ? and catalog_name = ?")) {
                 pstmt.setString(2, tablePath.getDatabaseName());
                 pstmt.setString(3, tablePath.getObjectName());
                 ResolvedCatalogTable catalogTable = (ResolvedCatalogTable) newTable;
@@ -520,10 +505,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
             CatalogPartition partition,
             boolean ignoreIfExists)
             throws TableNotExistException,
-            TableNotPartitionedException,
-            PartitionSpecInvalidException,
-            PartitionAlreadyExistsException,
-            CatalogException {
+                    TableNotPartitionedException,
+                    PartitionSpecInvalidException,
+                    PartitionAlreadyExistsException,
+                    CatalogException {
         throw new UnsupportedOperationException();
     }
 
@@ -559,10 +544,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
                     throw new FunctionAlreadyExistException(this.getName(), functionPath);
                 }
             } else {
-                try {
-                    PreparedStatement pstmt =
-                            conn.prepareStatement(
-                                    "insert into flink_catalog_functions (database_name, object_name,  class_name, function_language, catalog_name ) values (?, ?, ?, ?, ?)");
+                try (Connection conn = dataSource.getConnection();
+                        PreparedStatement pstmt =
+                                conn.prepareStatement(
+                                        "insert into flink_catalog_functions (database_name, object_name,  class_name, function_language, catalog_name ) values (?, ?, ?, ?, ?)")) {
                     pstmt.setString(1, path.getDatabaseName());
                     pstmt.setString(2, path.getObjectName());
                     pstmt.setString(3, function.getClassName());
@@ -600,10 +585,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
                                 newFunction.getClass().getName()));
             }
 
-            try {
-                PreparedStatement pstmt =
-                        conn.prepareStatement(
-                                "update flink_catalog_functions set class_name = ?, function_language =? where database_name = ? and object_name = ? and catalog_name = ?");
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement pstmt =
+                            conn.prepareStatement(
+                                    "update flink_catalog_functions set class_name = ?, function_language =? where database_name = ? and object_name = ? and catalog_name = ?")) {
                 pstmt.setString(1, newFunction.getClassName());
                 pstmt.setString(2, newFunction.getFunctionLanguage().name());
                 pstmt.setString(3, path.getDatabaseName());
@@ -630,10 +615,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
         ObjectPath functionPath = normalize(path);
 
         if (functionExists(functionPath)) {
-            try {
-                PreparedStatement pstmt =
-                        conn.prepareStatement(
-                                "delete from flink_catalog_functions where database_name = ? and object_name =? and catalog_name = ?");
+            try (Connection conn = dataSource.getConnection();
+                    PreparedStatement pstmt =
+                            conn.prepareStatement(
+                                    "delete from flink_catalog_functions where database_name = ? and object_name =? and catalog_name = ?")) {
                 pstmt.setString(1, path.getDatabaseName());
                 pstmt.setString(2, path.getObjectName());
                 pstmt.setString(3, getName());
@@ -720,10 +705,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
     @Override
     public List<String> listDatabases() throws CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select database_name from flink_catalog_databases where catalog_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select database_name from flink_catalog_databases where catalog_name = ?")) {
             pstmt.setString(1, getName());
             ResultSet resultSet = pstmt.executeQuery();
             List<String> result = new ArrayList<>();
@@ -740,10 +725,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     @Override
     public CatalogDatabase getDatabase(String databaseName)
             throws DatabaseNotExistException, CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select comment, properties from flink_catalog_databases where database_name = ? and catalog_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select comment, properties from flink_catalog_databases where database_name = ? and catalog_name = ?")) {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, getName());
             ResultSet resultSet = pstmt.executeQuery();
@@ -762,10 +747,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
     @Override
     public boolean databaseExists(String databaseName) throws CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select database_name from flink_catalog_databases where database_name = ? and catalog_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select database_name from flink_catalog_databases where database_name = ? and catalog_name = ?")) {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, getName());
             ResultSet resultSet = pstmt.executeQuery();
@@ -788,10 +773,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
         checkArgument(
                 !isNullOrWhitespaceOnly(databaseName), "databaseName cannot be null or empty");
 
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ?")) {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, getName());
             ResultSet resultSet = pstmt.executeQuery();
@@ -812,10 +797,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
         checkArgument(
                 !isNullOrWhitespaceOnly(databaseName), "databaseName cannot be null or empty");
 
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ? and kind = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ? and kind = ?")) {
             pstmt.setString(1, databaseName);
             pstmt.setString(2, getName());
             pstmt.setString(3, CatalogBaseTable.TableKind.VIEW.name());
@@ -834,10 +819,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     @Override
     public CatalogBaseTable getTable(ObjectPath tablePath)
             throws TableNotExistException, CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select kind, script, comment, `password`, schema_properties from flink_catalog_tables where database_name = ? and catalog_name = ? and object_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select kind, script, comment, `password`, schema_properties from flink_catalog_tables where database_name = ? and catalog_name = ? and object_name = ?")) {
             pstmt.setString(1, tablePath.getDatabaseName());
             pstmt.setString(2, getName());
             pstmt.setString(3, tablePath.getObjectName());
@@ -871,10 +856,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
     @Override
     public boolean tableExists(ObjectPath tablePath) throws CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ? and object_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select object_name from flink_catalog_tables where database_name = ? and catalog_name = ? and object_name = ?")) {
             pstmt.setString(1, tablePath.getDatabaseName());
             pstmt.setString(2, getName());
             pstmt.setString(3, tablePath.getObjectName());
@@ -903,9 +888,9 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     public List<CatalogPartitionSpec> listPartitions(
             ObjectPath tablePath, CatalogPartitionSpec partitionSpec)
             throws TableNotExistException,
-            TableNotPartitionedException,
-            PartitionSpecInvalidException,
-            CatalogException {
+                    TableNotPartitionedException,
+                    PartitionSpecInvalidException,
+                    CatalogException {
         return null;
     }
 
@@ -931,10 +916,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     @Override
     public List<String> listFunctions(String dbName)
             throws DatabaseNotExistException, CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select object_name from flink_catalog_functions where database_name = ? and catalog_name = ? ");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select object_name from flink_catalog_functions where database_name = ? and catalog_name = ? ")) {
             pstmt.setString(1, dbName);
             pstmt.setString(2, getName());
             ResultSet resultSet = pstmt.executeQuery();
@@ -952,10 +937,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
     @Override
     public CatalogFunction getFunction(ObjectPath functionPath)
             throws FunctionNotExistException, CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select class_name, function_language from flink_catalog_functions where database_name = ? and catalog_name = ? and object_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select class_name, function_language from flink_catalog_functions where database_name = ? and catalog_name = ? and object_name = ?")) {
             pstmt.setString(1, functionPath.getDatabaseName());
             pstmt.setString(2, getName());
             pstmt.setString(3, functionPath.getObjectName());
@@ -976,10 +961,10 @@ public class GenericInJdbcCatalog extends AbstractCatalog {
 
     @Override
     public boolean functionExists(ObjectPath functionPath) throws CatalogException {
-        try {
-            PreparedStatement pstmt =
-                    conn.prepareStatement(
-                            "select object_name from flink_catalog_functions where database_name = ? and catalog_name = ? and object_name = ?");
+        try (Connection conn = dataSource.getConnection();
+                PreparedStatement pstmt =
+                        conn.prepareStatement(
+                                "select object_name from flink_catalog_functions where database_name = ? and catalog_name = ? and object_name = ?")) {
             pstmt.setString(1, functionPath.getDatabaseName());
             pstmt.setString(2, getName());
             pstmt.setString(3, functionPath.getObjectName());

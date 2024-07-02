@@ -18,6 +18,11 @@
 
 package org.apache.flink.connector.jdbc.catalog.factory;
 
+import static org.apache.flink.connector.jdbc.catalog.factory.GenericInJdbcCatalogFactoryOptions.*;
+import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
+
+import com.zaxxer.hikari.HikariConfig;
+
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.connector.jdbc.catalog.GenericInJdbcCatalog;
 import org.apache.flink.table.catalog.Catalog;
@@ -28,9 +33,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import static org.apache.flink.connector.jdbc.catalog.factory.GenericInJdbcCatalogFactoryOptions.*;
-import static org.apache.flink.table.factories.FactoryUtil.PROPERTY_VERSION;
 
 /** Factory for {@link GenericInJdbcCatalog}. */
 public class GenericInJdbcCatalogFactory implements CatalogFactory {
@@ -57,6 +59,12 @@ public class GenericInJdbcCatalogFactory implements CatalogFactory {
         final Set<ConfigOption<?>> options = new HashSet<>();
         options.add(PROPERTY_VERSION);
         options.add(SECRET_KEY);
+        options.add(POOL_MAX_SIZE);
+        options.add(POOL_MIN_IDLE);
+        options.add(MAX_LIFE_TIME);
+        options.add(CONNECTOR_TIMEOUT);
+        options.add(JDBC_DRIVER_CLASS);
+        options.add(CONNECTON_TEST_QUERY);
         return options;
     }
 
@@ -66,12 +74,20 @@ public class GenericInJdbcCatalogFactory implements CatalogFactory {
                 FactoryUtil.createCatalogFactoryHelper(this, context);
         helper.validate();
 
+        HikariConfig hikariConfig = new HikariConfig();
+        hikariConfig.setPassword(helper.getOptions().get(PASSWORD));
+        hikariConfig.setUsername(helper.getOptions().get(USERNAME));
+        hikariConfig.setJdbcUrl(helper.getOptions().get(URL));
+        hikariConfig.setMinimumIdle(helper.getOptions().get(POOL_MIN_IDLE));
+        hikariConfig.setMaximumPoolSize(helper.getOptions().get(POOL_MAX_SIZE));
+        hikariConfig.setConnectionTimeout(helper.getOptions().get(CONNECTOR_TIMEOUT));
+        hikariConfig.setMaxLifetime(helper.getOptions().get(MAX_LIFE_TIME));
+        hikariConfig.setDriverClassName(helper.getOptions().get(JDBC_DRIVER_CLASS));
+        hikariConfig.setConnectionTestQuery(helper.getOptions().get(CONNECTON_TEST_QUERY));
         return new GenericInJdbcCatalog(
                 context.getName(),
                 helper.getOptions().get(DEFAULT_DATABASE),
-                helper.getOptions().get(USERNAME),
-                helper.getOptions().get(PASSWORD),
-                helper.getOptions().get(URL),
-                helper.getOptions().get(SECRET_KEY));
+                helper.getOptions().get(SECRET_KEY),
+                hikariConfig);
     }
 }

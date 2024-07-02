@@ -5,7 +5,7 @@
 
     <groupId>io.github.jeff-zou</groupId>
     <artifactId>flink-catalog-in-jdbc</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
     <name>flink-catalog-in-jdbc</name>
 
     <description>the catalog for flink which store in jdbc.</description>
@@ -142,6 +142,14 @@
             <version>1.4.200</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.zaxxer/HikariCP -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>4.0.3</version>
+        </dependency>
+
     </dependencies>
 
     <build>
