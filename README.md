@@ -1,7 +1,7 @@
 ### Instructions for use：
 
 After executing mvn package on the command line, import the generated package
-flink-catalog-in-jdbc-2.0.1.jar into flink(support flink 1.16) lib, no other settings are required.
+flink-catalog-in-jdbc-2.0.1.jar into flink lib, no other settings are required.
 
 Development environment engineering direct reference:
 
