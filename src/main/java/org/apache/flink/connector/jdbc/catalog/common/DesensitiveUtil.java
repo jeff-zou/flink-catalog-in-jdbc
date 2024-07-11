@@ -34,7 +34,8 @@ public class DesensitiveUtil {
             return password;
         }
 
-        if (properties.get("connector").contains("kafka")) {
+        if (properties.get("connector").contains("kafka")
+                || properties.get("connector").contains("upsert-kafka")) {
             String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
                 int passwordStartIndex = sasl.indexOf("password=\"") + 10;
@@ -60,7 +61,8 @@ public class DesensitiveUtil {
             return false;
         }
 
-        if (properties.get("connector").contains("kafka")) {
+        if (properties.get("connector").contains("kafka")
+                || properties.get("connector").contains("upsert-kafka")) {
             String sasl = properties.get(SENSITIVE_KEY_SASL);
             if (sasl != null) {
                 sasl = sasl.replace(DESENSITIVE_STRIGN, password);
